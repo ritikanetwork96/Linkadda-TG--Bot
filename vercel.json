@@ -1,22 +1,27 @@
 {
   "version": 2,
-  "outputDirectory": "admin",
-  "routes": [
+  "builds": [
     {
-      "src": "/api/(.*)",
-      "dest": "https://linkadda-tg-bot.onrender.com/api/$1"
+      "src": "admin/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://linkadda-tg-bot.onrender.com/api/$1"
     },
     {
-      "src": "/l/(.*)",
-      "dest": "https://linkadda-tg-bot.onrender.com/l/$1"
+      "source": "/l/(.*)",
+      "destination": "https://linkadda-tg-bot.onrender.com/l/$1"
     },
     {
-      "src": "/login",
-      "dest": "/login.html"
+      "source": "/login",
+      "destination": "/admin/login.html"
     },
     {
-      "src": "/(.*)",
-      "dest": "/$1"
+      "source": "/(.*)",
+      "destination": "/admin/$1"
     }
   ]
 }
