@@ -513,7 +513,6 @@ export async function showSettingsMenu(ctx) {
   const behaviour = settings.startBehaviour || 'WELCOME_ONLY';
   const labelMap = {
     'WELCOME_ONLY': '🟢 Welcome Message Only',
-    'WELCOME_MENU': '🟢 Welcome + Main Menu',
     'CONFIGURED_CONTENT': '🟢 Welcome + Configured Content',
     'CONFIGURED_SEQUENCE': '🟢 Configured Sequence',
     'DISABLED': '🔴 Disabled'
@@ -533,9 +532,8 @@ export async function showSettingsMenu(ctx) {
 
   const markup = {
     inline_keyboard: [
-      [{ text: 'Welcome Only', callback_data: 'admin:set:start:select:WELCOME_ONLY' }, { text: 'Welcome + Menu', callback_data: 'admin:set:start:select:WELCOME_MENU' }],
-      [{ text: 'Configured Content', callback_data: 'admin:set:start:select:CONFIGURED_CONTENT' }, { text: 'Configured Sequence', callback_data: 'admin:set:start:select:CONFIGURED_SEQUENCE' }],
-      [{ text: 'Disabled', callback_data: 'admin:set:start:select:DISABLED' }],
+      [{ text: 'Welcome Only', callback_data: 'admin:set:start:select:WELCOME_ONLY' }, { text: 'Configured Content', callback_data: 'admin:set:start:select:CONFIGURED_CONTENT' }],
+      [{ text: 'Configured Sequence', callback_data: 'admin:set:start:select:CONFIGURED_SEQUENCE' }, { text: 'Disabled', callback_data: 'admin:set:start:select:DISABLED' }],
       [{ text: '⚙️ Configure Sequence Onboarding', callback_data: 'admin:set:start:sequence:list:1' }],
       [{ text: '⚙️ Configure /start Content', callback_data: 'admin:set:start:content:list:1' }],
       [{ text: '⬅️ Back to Control Center', callback_data: 'admin:home' }]

@@ -1793,6 +1793,7 @@
     document.addEventListener('click', (e) => {
       if (e.target.classList.contains('modal-backdrop') && e.target.classList.contains('active')) {
         const modalId = e.target.id.replace('modal-', '');
+        if (modalId === 'confirm') return;
         closeModal(modalId);
       }
     });
