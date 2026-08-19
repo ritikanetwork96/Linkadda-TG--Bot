@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login - Linkaadda Bot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #09090b;
+      --bg-card: rgba(17, 17, 20, 0.7);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --text-main: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --accent: #8b5cf6;
+      --accent-hover: #7c3aed;
+      --error: #ef4444;
+      --success: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      overflow: auto;
+      position: relative;
+      padding: 1rem;
+    }
+
+    /* Ambient glow background */
+    body::before {
+      content: '';
+      position: fixed;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
+      top: -100px;
+      right: -100px;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(6, 182, 212, 0.1) 0%, rgba(0, 0, 0, 0) 70%);
+      bottom: -100px;
+      left: -100px;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .login-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      backdrop-filter: blur(16px);
+      padding: 2.25rem;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 420px;
+      z-index: 10;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    @media (max-width: 480px) {
+      .login-container {
+        padding: 1.5rem 1.25rem;
+        border-radius: 12px;
+      }
+    }
+
+    .header {
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #fff 0%, #a1a1aa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .form-group input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      color: var(--text-main);
+      font-size: 0.95rem;
+      transition: all 0.2s ease;
+      outline: none;
+    }
+
+    .form-group input:focus {
+      border-color: var(--accent);
+      background: rgba(255, 255, 255, 0.06);
+      box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+    }
+
+    .btn-login {
+      width: 100%;
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.75rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 1rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .btn-login:hover {
+      background: var(--accent-hover);
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+    }
+
+    .btn-login:disabled {
+      background: rgba(139, 92, 246, 0.5);
+      cursor: not-allowed;
+    }
+
+    .alert {
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      margin-bottom: 1.25rem;
+      display: none;
+      border: 1px solid transparent;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .alert-error {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+    }
+
+    .alert-success {
+      background: rgba(16, 185, 129, 0.1);
+      border-color: rgba(16, 185, 129, 0.2);
+      color: #a7f3d0;
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 0.8s linear infinite;
+      margin-right: 0.5rem;
+      display: none;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-container">
+    <div class="header">
+      <h1>Content Delivery Bot</h1>
+      <p>Sign in to the Admin Dashboard</p>
+    </div>
+
+    <div id="alertBox" class="alert"></div>
+
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="email">Username or Email</label>
+        <input type="email" id="email" required placeholder="admin@bot.com" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <label for="password" style="margin-bottom: 0.5rem;">Password</label>
+          <a href="#" id="forgotPasswordLink" style="font-size: 0.8rem; color: var(--accent); text-decoration: none; margin-bottom: 0.5rem;">Forgot Password?</a>
+        </div>
+        <input type="password" id="password" required placeholder="••••••••" autocomplete="current-password">
+      </div>
+
+      <button type="submit" id="submitBtn" class="btn-login">
+        <div id="btnSpinner" class="spinner"></div>
+        <span id="btnText">Sign In</span>
+      </button>
+    </form>
+
+    <form id="forgotForm" style="display: none;">
+      <div class="form-group">
+        <label for="forgotEmail">Admin Email</label>
+        <input type="email" id="forgotEmail" required placeholder="admin@bot.com">
+      </div>
+
+      <button type="submit" id="forgotSubmitBtn" class="btn-login">
+        <div id="forgotSpinner" class="spinner"></div>
+        <span id="forgotBtnText">Send OTP to Telegram</span>
+      </button>
+      <div style="text-align: center; margin-top: 1.25rem;">
+        <a href="#" id="backToLoginLink" style="font-size: 0.85rem; color: var(--text-muted); text-decoration: none;">Back to Sign In</a>
+      </div>
+    </form>
+
+    <form id="resetForm" style="display: none;">
+      <div class="form-group">
+        <label for="resetOtp">6-Digit Verification Code (OTP)</label>
+        <input type="text" id="resetOtp" required placeholder="123456" maxlength="6" pattern="\d{6}">
+      </div>
+      <div class="form-group">
+        <label for="resetNewPassword">New Password</label>
+        <input type="password" id="resetNewPassword" required placeholder="••••••••">
+      </div>
+      <div class="form-group">
+        <label for="resetConfirmPassword">Confirm New Password</label>
+        <input type="password" id="resetConfirmPassword" required placeholder="••••••••">
+      </div>
+
+      <button type="submit" id="resetSubmitBtn" class="btn-login">
+        <div id="resetSpinner" class="spinner"></div>
+        <span id="resetBtnText">Reset Password</span>
+      </button>
+      <div style="text-align: center; margin-top: 1.25rem;">
+        <a href="#" id="backToLoginLink2" style="font-size: 0.85rem; color: var(--text-muted); text-decoration: none;">Back to Sign In</a>
+      </div>
+    </form>
+  </div>
+
+  <script type="module" src="js/api.js"></script>
+  <script type="module" src="js/auth.js"></script>
+  <script type="module">
+    // Handle redirect if already logged in
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Check auth state using token verification
+      const isLoggedIn = await Auth.checkAuthSilent();
+      if (isLoggedIn) {
+        window.location.href = 'index.html';
+      }
+    });
+
+    const loginForm = document.getElementById('loginForm');
+    const alertBox = document.getElementById('alertBox');
+    const submitBtn = document.getElementById('submitBtn');
+    const btnSpinner = document.getElementById('btnSpinner');
+    const btnText = document.getElementById('btnText');
+
+    const forgotPasswordLink = document.getElementById('forgotPasswordLink');
+    const backToLoginLink = document.getElementById('backToLoginLink');
+    const backToLoginLink2 = document.getElementById('backToLoginLink2');
+    const forgotForm = document.getElementById('forgotForm');
+    const resetForm = document.getElementById('resetForm');
+
+    forgotPasswordLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      loginForm.style.display = 'none';
+      forgotForm.style.display = 'block';
+      resetForm.style.display = 'none';
+      alertBox.style.display = 'none';
+    });
+
+    const goToLogin = (e) => {
+      if (e) e.preventDefault();
+      loginForm.style.display = 'block';
+      forgotForm.style.display = 'none';
+      resetForm.style.display = 'none';
+      alertBox.style.display = 'none';
+    };
+
+    backToLoginLink.addEventListener('click', goToLogin);
+    backToLoginLink2.addEventListener('click', goToLogin);
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      // Show Loading State
+      alertBox.style.display = 'none';
+      submitBtn.disabled = true;
+      btnSpinner.style.display = 'block';
+      btnText.textContent = 'Authenticating...';
+
+      try {
+        const response = await API.post('/auth/login', { email, password });
+        
+        if (response.status === 'success') {
+          // Success Feedback
+          alertBox.className = 'alert alert-success';
+          alertBox.textContent = 'Login successful! Redirecting...';
+          alertBox.style.display = 'block';
+          
+          // Save JWT in localStorage as fallback
+          localStorage.setItem('admin_token', response.token);
+          
+          setTimeout(() => {
+            window.location.href = 'index.html';
+          }, 1000);
+        } else {
+          showError(response.message || 'Invalid username or password.');
+        }
+      } catch (err) {
+        showError('A network error occurred. Please check if backend is running.');
+      }
+    });
+
+    // Handle Forgot Form Submit
+    forgotForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('forgotEmail').value.trim();
+      const sBtn = document.getElementById('forgotSubmitBtn');
+      const spinner = document.getElementById('forgotSpinner');
+      const textSpan = document.getElementById('forgotBtnText');
+
+      alertBox.style.display = 'none';
+      sBtn.disabled = true;
+      spinner.style.display = 'block';
+      textSpan.textContent = 'Sending...';
+
+      try {
+        const response = await API.post('/auth/forgot-password', { email });
+        if (response.status === 'success') {
+          alertBox.className = 'alert alert-success';
+          alertBox.textContent = response.message || 'OTP code sent to your Telegram admin IDs.';
+          alertBox.style.display = 'block';
+          
+          setTimeout(() => {
+            forgotForm.style.display = 'none';
+            resetForm.style.display = 'block';
+            alertBox.style.display = 'none';
+          }, 1500);
+        } else {
+          showError(response.message || 'Failed to send reset code.');
+        }
+      } catch (err) {
+        showError('A network error occurred. Please check backend.');
+      } finally {
+        sBtn.disabled = false;
+        spinner.style.display = 'none';
+        textSpan.textContent = 'Send OTP to Telegram';
+      }
+    });
+
+    // Handle Reset Form Submit
+    resetForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('forgotEmail').value.trim();
+      const otp = document.getElementById('resetOtp').value.trim();
+      const newPassword = document.getElementById('resetNewPassword').value;
+      const confirmPassword = document.getElementById('resetConfirmPassword').value;
+      const sBtn = document.getElementById('resetSubmitBtn');
+      const spinner = document.getElementById('resetSpinner');
+      const textSpan = document.getElementById('resetBtnText');
+
+      if (newPassword !== confirmPassword) {
+        showError('Passwords do not match.');
+        return;
+      }
+
+      alertBox.style.display = 'none';
+      sBtn.disabled = true;
+      spinner.style.display = 'block';
+      textSpan.textContent = 'Resetting...';
+
+      try {
+        const response = await API.post('/auth/reset-password', { email, otp, newPassword });
+        if (response.status === 'success') {
+          alertBox.className = 'alert alert-success';
+          alertBox.textContent = 'Password reset successfully! Redirecting to login...';
+          alertBox.style.display = 'block';
+
+          setTimeout(() => {
+            goToLogin();
+          }, 2000);
+        } else {
+          showError(response.message || 'Failed to reset password.');
+        }
+      } catch (err) {
+        showError('A network error occurred. Please check backend.');
+      } finally {
+        sBtn.disabled = false;
+        spinner.style.display = 'none';
+        textSpan.textContent = 'Reset Password';
+      }
+    });
+
+    function showError(message) {
+      alertBox.className = 'alert alert-error';
+      alertBox.textContent = message;
+      alertBox.style.display = 'block';
+      submitBtn.disabled = false;
+      btnSpinner.style.display = 'none';
+      btnText.textContent = 'Sign In';
+    }
+  </script>
+</body>
+</html>

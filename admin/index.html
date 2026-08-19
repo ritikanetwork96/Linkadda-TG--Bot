@@ -1,0 +1,1765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - Content Delivery Bot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+
+  <!-- Toast Container -->
+  <div id="toast-container" role="region" aria-label="Notifications" aria-live="polite"></div>
+
+  <!-- Universal Confirm Modal -->
+  <div id="modal-confirm" class="modal-backdrop">
+    <div class="modal modal-sm">
+      <div class="modal-body" style="text-align:center;padding:1.5rem 1.25rem">
+        <div class="confirm-icon danger">🗑</div>
+        <div class="confirm-title" style="font-weight:700;font-size:0.95rem;color:var(--text);margin-bottom:0.5rem">Are you sure?</div>
+        <div class="confirm-message"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="confirm-cancel-btn" class="btn btn-secondary">Cancel</button>
+        <button id="confirm-ok-btn" class="btn btn-danger">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ambient Glow Backgrounds -->
+  <div class="bg-ambient"></div>
+
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+      </div>
+      <h1>Bot Admin</h1>
+    </div>
+
+    <ul class="menu-items">
+      <li class="nav-sep"><span class="nav-section-label">Overview</span></li>
+      <li class="active" data-target="dashboard">
+        <a href="#dashboard">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Dashboard
+        </a>
+      </li>
+      <li data-target="analytics">
+        <a href="#analytics">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          Analytics
+        </a>
+      </li>
+
+      <li class="nav-sep"><span class="nav-section-label">Management</span></li>
+      <li data-target="bots">
+        <a href="#bots">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
+          Bots
+        </a>
+      </li>
+      <li data-target="content">
+        <a href="#content">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+          Content
+        </a>
+      </li>
+      <li data-target="content-packs">
+        <a href="#content-packs">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          Content Packs
+        </a>
+      </li>
+      <li data-target="categories">
+        <a href="#categories">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+          Categories
+        </a>
+      </li>
+      <li data-target="bot-menus">
+        <a href="#bot-menus">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h8M4 18h16"/></svg>
+          Start Message
+        </a>
+      </li>
+      <li data-target="users">
+        <a href="#users">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          Users
+        </a>
+      </li>
+
+      <li class="nav-sep"><span class="nav-section-label">Communication</span></li>
+      <li data-target="broadcasts">
+        <a href="#broadcasts">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+          Broadcast
+        </a>
+      </li>
+
+      <li class="nav-sep"><span class="nav-section-label">System</span></li>
+      <li data-target="settings">
+        <a href="#settings">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          Settings
+        </a>
+      </li>
+      <li data-target="storage">
+        <a href="#storage">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>
+          Storage
+        </a>
+      </li>
+      <li data-target="system-health">
+        <a href="#system-health">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          System Health
+        </a>
+      </li>
+      <li data-target="logs">
+        <a href="#logs">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Logs
+        </a>
+      </li>
+      <li id="menu-logout">
+        <a href="#">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+          Logout
+        </a>
+      </li>
+    </ul>
+
+    <div class="sidebar-footer">Bot Admin &mdash; v5</div>
+  </aside>
+
+  <!-- Sidebar overlay (mobile) -->
+  <div id="sidebar-overlay"></div>
+
+  <!-- Main Content Area -->
+  <main id="main-content">
+    <header class="top-bar">
+      <button class="hamburger" id="sidebar-toggle" aria-label="Toggle menu">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="22" height="22"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+      </button>
+      <h2 id="topbar-title">Dashboard</h2>
+      <div class="bot-selector-container">
+        <label for="active-bot-switcher">Bot:</label>
+        <select id="active-bot-switcher" class="form-select" style="max-width:160px;padding:0.38rem 1.8rem 0.38rem 0.7rem;font-size:0.82rem;">
+          <!-- Loaded dynamically -->
+        </select>
+      </div>
+      <div class="admin-profile" id="admin-name">Administrator</div>
+    </header>
+
+    <!-- ========================================== -->
+    <!-- PANEL: DASHBOARD -->
+    <!-- ========================================== -->
+    <section id="panel-dashboard" class="panel active">
+      <!-- Quick Actions and Demo Env Control Row -->
+      <div class="row-split mb-6" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+        
+        <!-- Quick Actions Card -->
+        <div class="card" style="display: flex; flex-direction: column; gap: 0.8rem;">
+          <h4 class="card-title" style="margin:0">Quick Actions</h4>
+          <div class="d-flex flex-wrap gap-2" style="margin-top: 0.5rem;">
+            <button class="btn btn-primary btn-sm" onclick="window.location.hash='content'; window.openModal('content-editor')">
+              ➕ Add Content
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="window.location.hash='categories'; window.openModal('category')">
+              📁 Create Category
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="window.location.hash='content-packs'; window.openModal('pack-editor')">
+              📦 Create Pack
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="window.location.hash='broadcasts'; window.openModal('broadcast-editor')">
+              📣 Broadcast
+            </button>
+          </div>
+        </div>
+
+        <!-- Demo Environment Control Card -->
+        <div class="card" style="display: flex; flex-direction: column; gap: 0.8rem;">
+          <h4 class="card-title" style="margin:0">Demo Workspace</h4>
+          <div class="d-flex align-center justify-between" style="margin-top: 0.2rem;">
+            <span style="font-size: 0.82rem;">Demo Status: <strong id="demo-status-text" class="text-warning">Checking...</strong></span>
+            <div class="d-flex gap-1" id="demo-actions-container">
+              <!-- Load / Clear buttons loaded dynamically via JS -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- KPI Metrics Grid -->
+      <div class="metrics-grid" id="dashboard-metrics">
+        <!-- Metric cards filled via JS -->
+      </div>
+      
+      <div class="row-split">
+        <div>
+          <h3 class="mb-4">Recent Users</h3>
+          <div class="table-container">
+            <table class="data-table" id="dashboard-users-table">
+              <thead>
+                <tr>
+                  <th>Telegram User</th>
+                  <th>Username</th>
+                  <th>Joined</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Filled via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <div>
+          <h3 class="mb-4">Recent Content</h3>
+          <div class="table-container">
+            <table class="data-table" id="dashboard-content-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Filled via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- PANEL: BOT MANAGEMENT -->
+    <!-- ========================================== -->
+    <section id="panel-bots" class="panel">
+      <div class="row-split">
+        <div>
+          <h3 class="mb-4">Registered Bots Pool</h3>
+          <div class="table-container">
+            <table class="data-table" id="bots-list-table">
+              <thead>
+                <tr>
+                  <th>Display Name</th>
+                  <th>Username</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Loaded via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <div>
+          <h3 class="mb-4">Register Bot Configuration</h3>
+          <div class="table-container p-6">
+            <form id="botTokenForm" style="display:flex; flex-direction:column; gap:1.25rem">
+              <div class="form-group">
+                <label for="botDisplayNameInput">Bot Friendly Name</label>
+                <input type="text" id="botDisplayNameInput" class="form-input" required placeholder="e.g. Media Bot A">
+              </div>
+              <div class="form-group">
+                <label for="botTokenInput">BotFather API Token</label>
+                <input type="password" id="botTokenInput" class="form-input" required placeholder="123456789:ABCdefGhIjkLmNoPQRsTuvWxYz...">
+              </div>
+              <button type="submit" class="btn btn-primary" id="btn-save-bot-token">Save & Verify Bot</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- PANEL: CATEGORIES -->
+    <!-- ========================================== -->
+    <section id="panel-categories" class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Categories</h2>
+          <p>Organize your content into discoverable categories.</p>
+        </div>
+        <button class="btn btn-primary" id="btn-add-category">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          New Category
+        </button>
+      </div>
+      <div class="table-container">
+        <table class="data-table" id="categories-table">
+          <thead>
+            <tr>
+              <th>Sort</th>
+              <th>Name</th>
+              <th>Slug</th>
+              <th>Status</th>
+              <th>Featured</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- PANEL: CONTENT -->
+    <!-- ========================================== -->
+    <section id="panel-content" class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Content Library</h2>
+          <p>Manage all media, documents, links and text content.</p>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-secondary" id="btn-bulk-upload">
+            📂 Bulk Upload
+          </button>
+          <button class="btn btn-primary" id="btn-add-content">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            Add Content
+          </button>
+        </div>
+      </div>
+
+      <div class="filters-bar">
+        <div class="search-wrap" style="flex:1;min-width:160px;max-width:280px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input type="text" id="content-search" class="form-input" placeholder="Search title, caption...">
+        </div>
+        <select id="content-filter-category" class="form-select"><option value="">All Categories</option></select>
+        <select id="content-filter-type" class="form-select">
+          <option value="">All Types</option>
+          <option value="text">Text</option>
+          <option value="link">Link</option>
+          <option value="photo">Photo</option>
+          <option value="video">Video</option>
+          <option value="document">Document</option>
+        </select>
+        <select id="content-filter-status" class="form-select">
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <select id="content-filter-featured" class="form-select">
+          <option value="">All Items</option>
+          <option value="true">Featured</option>
+          <option value="false">Non-Featured</option>
+        </select>
+        <select id="content-filter-sort" class="form-select">
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="title">A–Z</option>
+          <option value="sortOrder">Sort Order</option>
+        </select>
+      </div>
+
+      <div id="bulk-actions-toolbar" class="bulk-toolbar d-none mb-3">
+        <span>Selected: <strong id="bulk-select-count">0</strong> items</span>
+        <select id="bulk-action-select" class="form-select" style="width:auto;font-size:0.78rem;padding:0.32rem 1.7rem 0.32rem 0.6rem">
+          <option value="">Bulk Action…</option>
+          <option value="enable">Enable</option>
+          <option value="disable">Disable</option>
+          <option value="start">Add to Start</option>
+          <option value="unstart">Remove from Start</option>
+          <option value="featured">Mark Featured</option>
+          <option value="unfeatured">Unmark Featured</option>
+          <option value="category">Assign Category</option>
+          <option value="delete">Delete</option>
+        </select>
+        <select id="bulk-category-select" class="form-select d-none" style="width:auto;font-size:0.78rem;padding:0.32rem 1.7rem 0.32rem 0.6rem"></select>
+        <button id="btn-apply-bulk" class="btn btn-primary btn-sm">Apply</button>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table" id="content-table">
+          <thead>
+            <tr>
+              <th width="36"><input type="checkbox" id="select-all-content"></th>
+              <th>Title</th><th>Type</th><th>Category</th><th>Status</th><th>Flags</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="content-pagination"></div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- PANEL: CONTENT PACKS -->
+    <!-- ========================================== -->
+    <section id="panel-content-packs" class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Content Packs</h2>
+          <p>Group content into trackable delivery collections and generate deep links.</p>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-secondary" id="btn-seed-demo-data">
+            ⚡ Seed Demo Data
+          </button>
+          <button class="btn btn-primary" id="btn-create-pack">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            Create Content Pack
+          </button>
+        </div>
+      </div>
+
+      <div class="filters-bar">
+        <div class="search-wrap" style="flex:1;min-width:160px;max-width:280px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input type="text" id="pack-search" class="form-input" placeholder="Search name, code...">
+        </div>
+        <select id="pack-filter-status" class="form-select">
+          <option value="">All Statuses</option>
+          <option value="ACTIVE">Active</option>
+          <option value="DRAFT">Draft</option>
+          <option value="DISABLED">Disabled</option>
+          <option value="EXPIRED">Expired</option>
+        </select>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table" id="packs-table">
+          <thead>
+            <tr>
+              <th>Pack Name</th>
+              <th>Items</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Expires</th>
+              <th>Share Link</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="packs-pagination"></div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- PANEL: USERS LIST -->
+    <!-- ========================================== -->
+    <section id="panel-users" class="panel">
+      <div class="panel-header">
+        <div><h2>Users</h2><p>View and manage all Telegram users who have interacted with the bot.</p></div>
+      </div>
+      <div class="filters-bar">
+        <div class="search-wrap" style="flex:1;min-width:180px;max-width:300px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input type="text" id="users-search" class="form-input" placeholder="Name, username, or ID…">
+        </div>
+        <select id="users-filter-status" class="form-select">
+          <option value="">All Users</option>
+          <option value="active">Active</option>
+          <option value="blocked">Blocked</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+      <div class="table-container">
+        <table class="data-table" id="users-table">
+          <thead><tr>
+            <th>Telegram ID</th><th>Name</th><th>Username</th><th>Status</th><th>Joined</th><th>Last Active</th><th>Actions</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="users-pagination"></div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- PANEL: BROADCASTS -->
+    <!-- ========================================== -->
+    <section id="panel-broadcasts" class="panel">
+      <div class="d-flex justify-between mb-4 align-center">
+        <h3>Broadcast Transmissions</h3>
+        <button class="btn btn-primary" id="btn-create-broadcast">Create Broadcast</button>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table" id="broadcasts-table">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Sent / Targeted</th>
+              <th>Failed / Blocked</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Loaded via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- PANEL: SETTINGS -->
+    <!-- ========================================== -->
+    <section id="panel-settings" class="panel">
+      <div class="panel-header">
+        <div><h2>Settings</h2><p>Configure global bot behaviour and system parameters.</p></div>
+      </div>
+      <form id="settingsForm">
+        <div class="settings-section">
+          <div class="settings-section-header"><h4>Bot Messages</h4></div>
+          <div class="settings-section-body">
+            <div class="form-group">
+              <label for="setting-welcome">Welcome Message</label>
+              <textarea id="setting-welcome" class="form-textarea" placeholder="Enter your welcome message here..."></textarea>
+              <p class="form-hint">Sent permanently with every /start. Supports Telegram HTML formatting.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-header"><h4>Content Delivery</h4></div>
+          <div class="settings-section-body">
+            <div class="row-split">
+              <div class="form-group">
+                <label for="setting-limit">Start Content Limit</label>
+                <input type="number" id="setting-limit" class="form-input" min="1" max="100">
+                <p class="form-hint">Max items sent per /start (1–100)</p>
+              </div>
+              <div class="form-group">
+                <label for="setting-autodelete-hours">Auto Delete Window</label>
+                <select id="setting-autodelete-hours" class="form-select">
+                  <option value="1">1 Hour</option>
+                  <option value="6">6 Hours</option>
+                  <option value="12">12 Hours</option>
+                  <option value="24">24 Hours</option>
+                  <option value="48">48 Hours</option>
+                </select>
+              </div>
+            </div>
+            <div class="settings-row">
+              <div>
+                <div class="settings-row-label">Enable Start Content Delivery</div>
+                <div class="settings-row-desc">Send queued media after /start command</div>
+              </div>
+              <label class="form-toggle">
+                <input type="checkbox" id="setting-start-enabled">
+              </label>
+            </div>
+            <div class="settings-row">
+              <div>
+                <div class="settings-row-label">Enable Auto-Delete</div>
+                <div class="settings-row-desc">Remove delivered messages after the delete window</div>
+              </div>
+              <label class="form-toggle">
+                <input type="checkbox" id="setting-autodelete-enabled">
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-header"><h4>Bot Control</h4></div>
+          <div class="settings-section-body">
+            <div class="settings-row">
+              <div>
+                <div class="settings-row-label">Enable Bot Interactions</div>
+                <div class="settings-row-desc">When disabled, bot ignores all incoming messages</div>
+              </div>
+              <label class="form-toggle">
+                <input type="checkbox" id="setting-bot-enabled">
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-header"><h4>Admin Security Settings</h4></div>
+          <div class="settings-section-body">
+            <div class="form-group">
+              <label for="setting-admin-name">Admin Name</label>
+              <input type="text" id="setting-admin-name" class="form-input" placeholder="Default Administrator">
+            </div>
+            <div class="form-group">
+              <label for="setting-admin-email">Admin Email Address</label>
+              <input type="email" id="setting-admin-email" class="form-input" placeholder="admin@bot.com">
+            </div>
+            <div class="row-split">
+              <div class="form-group">
+                <label for="setting-admin-password">New Password (leave blank to keep current)</label>
+                <input type="password" id="setting-admin-password" class="form-input" placeholder="••••••••">
+              </div>
+              <div class="form-group">
+                <label for="setting-admin-confirm-password">Confirm New Password</label>
+                <input type="password" id="setting-admin-confirm-password" class="form-input" placeholder="••••••••">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:0.75rem;margin-top:0.5rem">
+          <button type="submit" class="btn btn-primary" id="btn-save-settings">Save Changes</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- PANEL: LOGS -->
+    <!-- ========================================== -->
+    <section id="panel-logs" class="panel">
+      <div class="panel-header">
+        <div><h2>Activity Logs</h2><p>Audit trail of all admin actions.</p></div>
+      </div>
+      <div class="filters-bar">
+        <select id="logs-filter-action" class="form-select">
+          <option value="">All Actions</option>
+          <option value="create_content">Create Content</option>
+          <option value="update_content">Update Content</option>
+          <option value="delete_content">Delete Content</option>
+          <option value="create_category">Create Category</option>
+          <option value="update_category">Update Category</option>
+          <option value="delete_category">Delete Category</option>
+          <option value="update_settings">Update Settings</option>
+          <option value="send_broadcast">Send Broadcast</option>
+          <option value="update_user">Update User</option>
+        </select>
+        <select id="logs-filter-status" class="form-select">
+          <option value="">All Status</option>
+          <option value="success">Success</option>
+          <option value="error">Error</option>
+        </select>
+      </div>
+      <div class="table-container">
+        <table class="data-table" id="logs-table">
+          <thead><tr>
+            <th>Timestamp</th><th>Action</th><th>Resource</th><th>Operator</th><th>Status</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="logs-pagination"></div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- PANEL: ANALYTICS -->
+    <!-- ========================================== -->
+    <section id="panel-analytics" class="panel">
+      <div class="panel-header">
+        <div><h2>Analytics</h2><p>Performance metrics and engagement data.</p></div>
+      </div>
+
+      <div class="date-tabs" role="group">
+        <button class="date-tab" data-range="today">Today</button>
+        <button class="date-tab active" data-range="7d">7 Days</button>
+        <button class="date-tab" data-range="30d">30 Days</button>
+        <button class="date-tab" data-range="90d">90 Days</button>
+      </div>
+
+      <div class="analytics-kpi-row">
+        <div class="kpi-box">
+          <div class="kpi-val" id="analytics-total-starts">—</div>
+          <div class="kpi-label">Total Starts</div>
+          <div class="kpi-sub" id="analytics-today-starts"></div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-val" id="analytics-file-requests">—</div>
+          <div class="kpi-label">File Requests</div>
+          <div class="kpi-sub" id="analytics-file-deliveries"></div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-val" id="analytics-search-count">—</div>
+          <div class="kpi-label">Searches</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-val" id="analytics-deep-link-views">—</div>
+          <div class="kpi-label">Deep Links</div>
+        </div>
+      </div>
+
+      <div class="row-split mb-6">
+        <div>
+          <h3 class="mb-4">Top Content Items</h3>
+          <div class="table-container">
+            <table class="data-table" id="analytics-content-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Type</th>
+                  <th>Requests</th>
+                  <th>Deliveries</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Loaded via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-4">Top Category Folders</h3>
+          <div class="table-container">
+            <table class="data-table" id="analytics-category-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Folder Views</th>
+                  <th>File Requests</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Loaded via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="mb-4">Recent Broadcast Campaign Performance</h3>
+        <div class="table-container">
+          <table class="data-table" id="analytics-broadcasts-table">
+            <thead>
+              <tr>
+                <th>Campaign Title</th>
+                <th>Status</th>
+                <th>Target Size</th>
+                <th>Delivered</th>
+                <th>Fails/Blocks</th>
+                <th>Date Dispatched</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Loaded via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- PANEL: BOT MENU CONFIGURATION -->
+    <!-- ========================================== -->
+    <section id="panel-bot-menus" class="panel">
+      <div class="d-flex justify-between mb-4 align-center">
+        <h3>Interactive Bot Menu Buttons</h3>
+        <button class="btn btn-primary" id="btn-add-bot-menu">Create Menu Button</button>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table" id="bot-menus-table">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Icon</th>
+              <th>Label</th>
+              <th>Action Type</th>
+              <th>Target Value</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Loaded via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- PANEL: STORAGE MANAGER -->
+    <!-- ========================================== -->
+    <section id="panel-storage" class="panel">
+      <div class="metrics-grid mb-6">
+        <div class="metric-card">
+          <h3>Total Media Count</h3>
+          <div class="value" id="storage-total-count">0</div>
+          <div class="sub-value">Database records</div>
+        </div>
+        <div class="metric-card">
+          <h3>S3 Storage Size</h3>
+          <div class="value" id="storage-s3-size">0 MB</div>
+          <div class="sub-value">Filebase space usage</div>
+        </div>
+        <div class="metric-card">
+          <h3>Orphan Objects</h3>
+          <div class="value" id="storage-orphans-count">0</div>
+          <div class="sub-value" style="color:var(--text-danger)">Unreferenced keys</div>
+        </div>
+      </div>
+
+      <div class="row-split mb-6">
+        <div>
+          <h3 class="mb-4">Orphaned S3 Candidates</h3>
+          <div class="table-container">
+            <table class="data-table" id="storage-orphans-table">
+              <thead>
+                <tr>
+                  <th>S3 Object Key</th>
+                  <th>Size</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Loaded via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-4">Content Metadata Health Check</h3>
+          <div class="table-container">
+            <table class="data-table" id="storage-health-table">
+              <thead>
+                <tr>
+                  <th>Item Title</th>
+                  <th>Severity</th>
+                  <th>Issues / Warnings</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Loaded via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- PANEL: SYSTEM HEALTH & OPERATIONS -->
+    <!-- ========================================== -->
+    <section id="panel-system-health" class="panel">
+      <div class="metrics-grid mb-6">
+        <div class="metric-card">
+          <h3>Uptime</h3>
+          <div class="value" id="system-uptime">0m</div>
+          <div class="sub-value">Process active run duration</div>
+        </div>
+        <div class="metric-card">
+          <h3>Memory Footprint</h3>
+          <div class="value" id="system-memory">0 MB</div>
+          <div class="sub-value">Node.js process RSS heap</div>
+        </div>
+        <div class="metric-card">
+          <h3>MongoDB Atlas</h3>
+          <div class="value" id="system-db-status" style="color:var(--accent-cyan)">Connected</div>
+          <div class="sub-value">Database driver status</div>
+        </div>
+      </div>
+
+      <div class="row-split mb-6">
+        <div>
+          <h3 class="mb-4">CSV Exporter & Metadata Importer</h3>
+          <div class="table-container p-6 mb-4">
+            <h4 class="mb-3" style="font-family:'Outfit'; font-size:1rem">Data Exporter</h4>
+            <div class="d-flex gap-2 mb-4">
+              <select id="export-resource-select" class="form-select" style="background:var(--bg-body); padding:0.5rem">
+                <option value="content">Content Metadata</option>
+                <option value="categories">Categories</option>
+                <option value="users">Telegram Users Directory</option>
+                <option value="broadcasts">Campaign Dispatch History</option>
+                <option value="logs">Activity Audit Logs</option>
+              </select>
+              <button id="btn-export-csv" class="btn btn-secondary">Download CSV</button>
+            </div>
+            
+            <hr style="border:0; border-top:1px solid var(--border-color); margin:1.5rem 0">
+
+            <h4 class="mb-3" style="font-family:'Outfit'; font-size:1rem">CSV Content Importer</h4>
+            <form id="csvImportForm" style="display:flex; flex-direction:column; gap:1rem">
+              <div class="form-group">
+                <label for="csvImportFile">Select Metadata CSV File</label>
+                <input type="file" id="csvImportFile" class="form-input" accept=".csv" required style="background:var(--bg-body)">
+              </div>
+              <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary" id="btn-import-preview">Dry-Run Preview</button>
+                <button type="button" class="btn btn-secondary d-none" id="btn-import-commit">Commit Import</button>
+              </div>
+            </form>
+            <div id="import-preview-results" class="mt-4 p-4 d-none" style="background:var(--bg-body); border-radius:8px; border:1px solid var(--border-color)">
+              <!-- Import statistics shown here -->
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-4">Background Worker Services</h3>
+          <div class="table-container">
+            <table class="data-table" id="system-workers-table">
+              <thead>
+                <tr>
+                  <th>Job Type</th>
+                  <th>Status</th>
+                  <th>Last Run</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Automatic Deletion Job</strong></td>
+                  <td><span class="badge badge-success">Active</span></td>
+                  <td id="worker-delete-last-run">Every hour</td>
+                </tr>
+                <tr>
+                  <td><strong>Broadcast Campaign Dispatcher</strong></td>
+                  <td><span class="badge badge-success">Active</span></td>
+                  <td>Sequential queue handler</td>
+                </tr>
+                <tr>
+                  <td><strong>Scheduled Campaign Dispatcher</strong></td>
+                  <td><span class="badge badge-success">Active</span></td>
+                  <td>Every minute</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- MODAL: ADD/EDIT CATEGORY -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="modal-category">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-category-title">Create Category</h3>
+        <button class="modal-close" onclick="closeModal('category')">&times;</button>
+      </div>
+      <form id="categoryForm">
+        <input type="hidden" id="category-id">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="category-name">Name</label>
+            <input type="text" id="category-name" class="form-input" required placeholder="e.g. Action Movies">
+          </div>
+          <div class="form-group">
+            <label for="category-display-name">Display Name (Friendly Title)</label>
+            <input type="text" id="category-display-name" class="form-input" placeholder="e.g. Action Movies">
+          </div>
+          <div class="form-group">
+            <label for="category-icon">Emoji / Icon (Optional)</label>
+            <input type="text" id="category-icon" class="form-input" placeholder="e.g. 🎬">
+          </div>
+          <div class="form-group">
+            <label for="category-slug">Slug</label>
+            <input type="text" id="category-slug" class="form-input" required placeholder="e.g. action-movies">
+          </div>
+          <div class="form-group">
+            <label for="category-desc">Description</label>
+            <textarea id="category-desc" class="form-textarea" placeholder="Describe this category..."></textarea>
+          </div>
+          <div class="form-group">
+            <label for="category-is-featured" style="display:inline-flex; align-items:center; gap: 0.5rem; cursor:pointer;">
+              <input type="checkbox" id="category-is-featured" style="width:16px; height:16px"> Mark Category as Featured
+            </label>
+          </div>
+          <div class="row-split">
+            <div class="form-group">
+              <label for="category-status">Status</label>
+              <select id="category-status" class="form-select">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="category-sort">Sort Order</label>
+              <input type="number" id="category-sort" class="form-input" value="0">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('category')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: ADD/EDIT CONTENT -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="modal-content-editor">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-content-title">Add Content</h3>
+        <button class="modal-close" onclick="closeModal('content-editor')">&times;</button>
+      </div>
+      <form id="contentForm">
+        <input type="hidden" id="content-id">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="content-type">Type</label>
+            <select id="content-type" class="form-select">
+              <option value="text">Text</option>
+              <option value="link">Link</option>
+              <option value="photo">Photo File</option>
+              <option value="video">Video File</option>
+              <option value="document">Document File</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="content-title">Title</label>
+            <input type="text" id="content-title" class="form-input" required placeholder="Describe this content item...">
+          </div>
+          
+          <div class="form-group">
+            <label for="content-category">Category</label>
+            <select id="content-category" class="form-select">
+              <option value="">No Category</option>
+            </select>
+          </div>
+
+          <!-- Dynamic File Field -->
+          <div class="form-group d-none" id="content-file-group">
+            <label for="content-file" id="content-file-label">Upload File</label>
+            <input type="file" id="content-file" class="form-input">
+            <!-- Progress Bar -->
+            <div class="progress-bar-container" id="upload-progress-container">
+              <div class="progress-bar" id="upload-progress-bar"></div>
+            </div>
+            <small class="text-muted mt-1 d-block" id="upload-progress-text"></small>
+          </div>
+
+          <!-- Dynamic URL Field -->
+          <div class="form-group d-none" id="content-url-group">
+            <label for="content-url">Link URL</label>
+            <input type="url" id="content-url" class="form-input" placeholder="https://example.com/...">
+          </div>
+
+          <!-- Dynamic Text Field -->
+          <div class="form-group d-none" id="content-text-group">
+            <label for="content-text">Text Body</label>
+            <textarea id="content-text" class="form-textarea" placeholder="Type text here..."></textarea>
+          </div>
+
+          <!-- Caption Field (for media types) -->
+          <div class="form-group" id="content-caption-group">
+            <label for="content-caption">Caption</label>
+            <textarea id="content-caption" class="form-textarea" placeholder="Optional media caption..."></textarea>
+          </div>
+          
+          <div class="row-split">
+            <div class="form-group">
+              <label for="content-status">Status</label>
+              <select id="content-status" class="form-select">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="content-sort">Sort Order</label>
+              <input type="number" id="content-sort" class="form-input" value="0">
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="content-is-start" style="display:inline-flex; align-items:center; gap: 0.5rem; cursor:pointer;">
+              <input type="checkbox" id="content-is-start" style="width:16px; height:16px"> Enable as Start Content
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label for="content-is-featured" style="display:inline-flex; align-items:center; gap: 0.5rem; cursor:pointer;">
+              <input type="checkbox" id="content-is-featured" style="width:16px; height:16px"> Mark as Featured Content
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('content-editor')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-content">Save Content</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: BULK UPLOAD MEDIA -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="modal-bulk-upload">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Bulk Media Upload Manager</h3>
+        <button class="modal-close" onclick="closeModal('bulk-upload')">&times;</button>
+      </div>
+      <form id="bulkUploadForm">
+        <div class="modal-body" style="max-height: 480px; overflow-y: auto;">
+          <div class="form-group">
+            <label for="bulk-upload-files">Choose Media Files (Multiple allowed)</label>
+            <input type="file" id="bulk-upload-files" class="form-input" multiple required style="background:var(--bg-card)">
+          </div>
+
+          <h4 class="mb-3 mt-4" style="font-family:'Outfit'; font-size:0.95rem">Preset Default Metadata Metadata</h4>
+          
+          <div class="row-split">
+            <div class="form-group">
+              <label for="bulk-preset-category">Category Assignment</label>
+              <select id="bulk-preset-category" class="form-select" style="background:var(--bg-card)">
+                <option value="">No Category</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="bulk-preset-status">Status</label>
+              <select id="bulk-preset-status" class="form-select" style="background:var(--bg-card)">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="bulk-preset-caption">Caption Template (Optional)</label>
+            <textarea id="bulk-preset-caption" class="form-textarea" placeholder="Defaults to file name if left blank..."></textarea>
+          </div>
+
+          <div class="row-split" style="gap: 1.5rem">
+            <div class="form-group">
+              <label for="bulk-preset-start" style="display:inline-flex; align-items:center; gap: 0.5rem; cursor:pointer;">
+                <input type="checkbox" id="bulk-preset-start" style="width:16px; height:16px"> Enable as Start Content
+              </label>
+            </div>
+            <div class="form-group">
+              <label for="bulk-preset-featured" style="display:inline-flex; align-items:center; gap: 0.5rem; cursor:pointer;">
+                <input type="checkbox" id="bulk-preset-featured" style="width:16px; height:16px"> Mark as Featured Content
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group mt-3">
+            <label for="bulk-upload-concurrency">Upload Concurrency (Limit)</label>
+            <select id="bulk-upload-concurrency" class="form-select" style="background:var(--bg-card)">
+              <option value="3">3 Concurrent Uploads (Recommended)</option>
+              <option value="5">5 Concurrent Uploads (Fast)</option>
+              <option value="1">1 (Sequential uploads)</option>
+            </select>
+          </div>
+
+          <div id="bulk-upload-queue-results" class="mt-4 p-4 d-none" style="background:var(--bg-body); border-radius:8px; border:1px solid var(--border-color)">
+            <!-- Displays parallel upload progress meters -->
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('bulk-upload')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-start-bulk-upload">Start Upload Queue</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: CREATE BROADCAST -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="modal-broadcast-editor">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Create Broadcast</h3>
+        <button class="modal-close" onclick="closeModal('broadcast-editor')">&times;</button>
+      </div>
+      <form id="broadcastForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="broadcast-title">Broadcast Name (Internal)</label>
+            <input type="text" id="broadcast-title" class="form-input" required placeholder="e.g. Independence Day Promo">
+          </div>
+          <div class="form-group">
+            <label for="broadcast-type">Type</label>
+            <select id="broadcast-type" class="form-select">
+              <option value="text">Text Only</option>
+              <option value="photo">Photo & Caption</option>
+              <option value="video">Video & Caption</option>
+              <option value="document">Document & Caption</option>
+            </select>
+          </div>
+
+          <div class="form-group d-none" id="broadcast-file-group">
+            <label for="broadcast-file">Media File</label>
+            <input type="file" id="broadcast-file" class="form-input">
+          </div>
+
+          <div class="form-group">
+            <label for="broadcast-text">Message Content</label>
+            <textarea id="broadcast-text" class="form-textarea" required placeholder="Type the broadcast message..."></textarea>
+          </div>
+
+          <h4 class="mb-3 mt-4" style="font-family:'Outfit'; font-size:0.95rem">Url Button (Optional)</h4>
+          <div class="row-split">
+            <div class="form-group">
+              <label for="broadcast-btn-label">Button Label</label>
+              <input type="text" id="broadcast-btn-label" class="form-input" placeholder="e.g. Open Link">
+            </div>
+            <div class="form-group">
+              <label for="broadcast-btn-url">Button URL</label>
+              <input type="url" id="broadcast-btn-url" class="form-input" placeholder="https://...">
+            </div>
+          </div>
+
+          <div class="form-group mt-4">
+            <label for="broadcast-scheduled-at">Schedule Dispatch Time (Optional)</label>
+            <input type="datetime-local" id="broadcast-scheduled-at" class="form-input" style="background:var(--bg-card); color:var(--text-main); border:1px solid var(--border-color); padding: 0.75rem; border-radius: 8px; width: 100%;">
+            <small class="text-muted" style="font-size:0.75rem">Leave empty to dispatch immediately in the background.</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('broadcast-editor')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Dispatch Broadcast</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: ADD/EDIT BOT MENU BUTTON -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="modal-bot-menu">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-bot-menu-title">Create Menu Button</h3>
+        <button class="modal-close" onclick="closeModal('bot-menu')">&times;</button>
+      </div>
+      <form id="botMenuForm">
+        <div class="modal-body">
+          <input type="hidden" id="bot-menu-id">
+          <div class="form-group">
+            <label for="bot-menu-label">Button Label</label>
+            <input type="text" id="bot-menu-label" class="form-input" required placeholder="e.g. Help Support">
+          </div>
+          <div class="form-group">
+            <label for="bot-menu-icon">Icon / Emoji (Optional)</label>
+            <input type="text" id="bot-menu-icon" class="form-input" placeholder="e.g. ℹ️">
+          </div>
+          <div class="form-group">
+            <label for="bot-menu-action">Action Type</label>
+            <select id="bot-menu-action" class="form-input" required style="background:var(--bg-card); color:var(--text-main); border:1px solid var(--border-color); padding: 0.75rem; border-radius: 8px;">
+              <option value="CATEGORY">CATEGORY (Browse folder)</option>
+              <option value="CONTENT">CONTENT (Show single file)</option>
+              <option value="SEARCH">SEARCH (Search interface)</option>
+              <option value="FEATURED">FEATURED (Show featured items)</option>
+              <option value="HELP">HELP (Show support text)</option>
+              <option value="URL">URL (Link to web page)</option>
+              <option value="COMMAND">COMMAND (Trigger bot command)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="bot-menu-target">Target Reference (e.g. ID, URL, or Command)</label>
+            <input type="text" id="bot-menu-target" class="form-input" placeholder="Category/Content ID, URL link, or Command string">
+            <small class="text-muted" style="font-size:0.75rem">Leave empty for SEARCH, FEATURED, and HELP actions.</small>
+          </div>
+          <div class="form-group">
+            <label for="bot-menu-order">Sort Order</label>
+            <input type="number" id="bot-menu-order" class="form-input" value="0" min="0">
+          </div>
+          <div class="form-group">
+            <label for="bot-menu-status">Status</label>
+            <select id="bot-menu-status" class="form-input" style="background:var(--bg-card); color:var(--text-main); border:1px solid var(--border-color); padding: 0.75rem; border-radius: 8px;">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('bot-menu')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Button</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: ADD/EDIT CONTENT PACK -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="modal-pack-editor">
+    <div class="modal modal-lg" style="max-width:850px">
+      <div class="modal-header">
+        <h3 id="modal-pack-title">Create Content Pack</h3>
+        <button class="modal-close" onclick="closeModal('pack-editor')">&times;</button>
+      </div>
+      <form id="packForm">
+        <input type="hidden" id="pack-id">
+        <div class="modal-body" style="max-height: calc(100vh - 200px); overflow-y: auto;">
+          
+          <div class="row-split">
+            <div class="form-group">
+              <label for="pack-name-input">Pack Name</label>
+              <input type="text" id="pack-name-input" class="form-input" required placeholder="e.g. Premium Demo Collection">
+            </div>
+            <div class="form-group">
+              <label for="pack-status-input">Status</label>
+              <select id="pack-status-input" class="form-select">
+                <option value="ACTIVE">Active</option>
+                <option value="DRAFT">Draft</option>
+                <option value="DISABLED">Disabled</option>
+                <option value="EXPIRED">Expired</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="pack-desc-input">Description</label>
+            <textarea id="pack-desc-input" class="form-textarea" placeholder="Describe the purpose of this content pack..."></textarea>
+          </div>
+
+          <div class="row-split">
+            <div class="form-group">
+              <label for="pack-expires-input">Expiry Date (Optional)</label>
+              <input type="datetime-local" id="pack-expires-input" class="form-input" style="background:var(--bg-card); color:var(--text-main); border:1px solid var(--border-color); padding: 0.75rem; border-radius: 8px;">
+            </div>
+            <div class="form-group" style="display:flex; align-items:center; margin-top:1.5rem">
+              <label for="pack-protect-input" style="display:inline-flex; align-items:center; gap: 0.5rem; cursor:pointer;">
+                <input type="checkbox" id="pack-protect-input" style="width:16px; height:16px"> Protect Content (Disable forward/save)
+              </label>
+            </div>
+          </div>
+
+          <div class="panel-header mt-6" style="padding:0; margin-bottom:1rem">
+            <div>
+              <h4 style="font-family:'Outfit'; font-size:1rem; font-weight:600; margin:0">Selected Content Library Items</h4>
+              <p class="text-muted" style="font-size:0.78rem; margin:0">Add content items to this pack and reorder them for delivery.</p>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-pack-add-content-trigger">
+              📂 Add Content
+            </button>
+          </div>
+
+          <div class="table-container" style="border:1px solid var(--border-color); border-radius:8px;">
+            <table class="data-table" id="pack-selected-items-table">
+              <thead>
+                <tr>
+                  <th width="40">#</th>
+                  <th>Title</th>
+                  <th>Type</th>
+                  <th>Caption Override</th>
+                  <th width="120">Mode</th>
+                  <th width="60">On</th>
+                  <th width="140">Order</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Selected pack items loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('pack-editor')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-pack">Save Pack</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: NESTED CONTENT SELECTOR -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="modal-content-selector" style="z-index: 1100">
+    <div class="modal" style="max-width:700px; margin-top:2rem">
+      <div class="modal-header">
+        <h3>Select Content Items</h3>
+        <button type="button" class="modal-close" onclick="closeModal('content-selector')">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height: calc(100vh - 250px); overflow-y: auto;">
+        
+        <div class="filters-bar mb-3">
+          <div class="search-wrap" style="flex:1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input type="text" id="selector-search" class="form-input" placeholder="Search title...">
+          </div>
+          <select id="selector-filter-category" class="form-select"></select>
+          <select id="selector-filter-type" class="form-select">
+            <option value="">All Types</option>
+            <option value="text">Text</option>
+            <option value="link">Link</option>
+            <option value="photo">Photo</option>
+            <option value="video">Video</option>
+            <option value="document">Document</option>
+          </select>
+        </div>
+
+        <div class="d-flex justify-between align-center mb-3">
+          <span class="text-muted" style="font-size:0.8rem">
+            Selected: <strong id="selector-selected-count" class="text-cyan">0</strong> items
+          </span>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-selector-select-all">Select All</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-selector-clear-all">Clear All</button>
+          </div>
+        </div>
+
+        <div class="table-container" style="max-height: 250px; overflow-y: auto; border:1px solid var(--border-color); border-radius:8px">
+          <table class="data-table" id="selector-items-table">
+            <thead>
+              <tr>
+                <th width="40"><input type="checkbox" id="selector-select-all-cb"></th>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Category</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Contents loaded via API -->
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('content-selector')">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btn-selector-add-selected">Add Selected</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: PACK PREVIEW & ANALYTICS -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="modal-pack-preview">
+    <div class="modal modal-lg" style="max-width:800px">
+      <div class="modal-header">
+        <h3 id="modal-preview-pack-title">Pack Details & Analytics</h3>
+        <button class="modal-close" onclick="closeModal('pack-preview')">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height: calc(100vh - 200px); overflow-y: auto;">
+        
+        <div class="row-split mb-6" style="gap: 1.5rem">
+          <div>
+            <h4 style="font-family:'Outfit'; font-size:0.95rem" class="mb-3">Metadata Info</h4>
+            <ul style="list-style:none; padding:0; display:flex; flex-direction:column; gap:0.5rem; font-size:0.85rem">
+              <li>Status: <span class="badge" id="preview-pack-status">ACTIVE</span></li>
+              <li>Public Code: <code id="preview-pack-code">—</code></li>
+              <li>Expiry Date: <span class="text-muted" id="preview-pack-expiry">—</span></li>
+              <li>Content Protection: <span class="text-muted" id="preview-pack-protection">Disabled</span></li>
+            </ul>
+          </div>
+          <div>
+            <h4 style="font-family:'Outfit'; font-size:0.95rem" class="mb-3">Delivery Estimate</h4>
+            <ul style="list-style:none; padding:0; display:flex; flex-direction:column; gap:0.5rem; font-size:0.85rem">
+              <li>Total Active Items: <strong id="preview-pack-total-items">0</strong></li>
+              <li>Estimated Messages: <strong id="preview-pack-est-msgs">0</strong></li>
+            </ul>
+          </div>
+        </div>
+
+        <h4 style="font-family:'Outfit'; font-size:0.95rem" class="mb-3 mt-5">Open Performance metrics & Engagement Data</h4>
+        <div class="metrics-grid mb-6" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1rem">
+          <div class="metric-card" style="padding:1rem">
+            <h3 style="font-size:0.75rem; color:var(--text-dim)">Total Opens</h3>
+            <div class="value" id="analytics-pack-opens" style="font-size:1.5rem; margin-top:0.25rem">—</div>
+          </div>
+          <div class="metric-card" style="padding:1rem">
+            <h3 style="font-size:0.75rem; color:var(--text-dim)">Unique Users</h3>
+            <div class="value" id="analytics-pack-users" style="font-size:1.5rem; margin-top:0.25rem">—</div>
+          </div>
+          <div class="metric-card" style="padding:1rem">
+            <h3 style="font-size:0.75rem; color:var(--text-dim)">Messages Sent</h3>
+            <div class="value" id="analytics-pack-msgs" style="font-size:1.5rem; margin-top:0.25rem">—</div>
+          </div>
+          <div class="metric-card" style="padding:1rem">
+            <h3 style="font-size:0.75rem; color:var(--text-dim)">Failed Deliveries</h3>
+            <div class="value" id="analytics-pack-failed" style="font-size:1.5rem; margin-top:0.25rem; color:var(--text-danger)">—</div>
+          </div>
+        </div>
+
+        <h4 style="font-family:'Outfit'; font-size:0.95rem" class="mb-3">Pack Delivery Sequence</h4>
+        <div class="table-container" style="border:1px solid var(--border-color); border-radius:8px;">
+          <table class="data-table" id="preview-pack-items-table">
+            <thead>
+              <tr>
+                <th width="40">#</th>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Caption Override</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('pack-preview')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main scripts -->
+  <script type="module" src="js/toast.js"></script>
+  <script type="module" src="js/confirm.js"></script>
+  <script type="module" src="js/api.js"></script>
+  <script type="module" src="js/auth.js"></script>
+  
+  <!-- Panel scripts -->
+  <script type="module" src="js/dashboard.js"></script>
+  <script type="module" src="js/bots.js"></script>
+  <script type="module" src="js/categories.js"></script>
+  <script type="module" src="js/content.js"></script>
+  <script type="module" src="js/start-content.js"></script>
+  <script type="module" src="js/content-packs.js"></script>
+  <script type="module" src="js/settings.js"></script>
+  <script type="module" src="js/users.js"></script>
+  <script type="module" src="js/broadcasts.js"></script>
+  <script type="module" src="js/logs.js"></script>
+  <script type="module" src="js/bot-menus.js"></script>
+  <script type="module" src="js/analytics.js"></script>
+  <script type="module" src="js/storage.js"></script>
+  <script type="module" src="js/system.js"></script>
+  <script type="module" src="js/bulk.js"></script>
+
+  <!-- Navigation / Modal controller -->
+  <script type="module">
+    import { Auth } from './js/auth.js';
+    import { populateGlobalBotSwitcher } from './js/bots.js';
+    import { Confirm } from './js/confirm.js';
+    
+    // Auth Check
+    document.addEventListener('DOMContentLoaded', async () => {
+      const authenticated = await Auth.checkAuth();
+      if (!authenticated) return;
+      
+      // Load user profile details
+      if (Auth.adminUser) {
+        document.getElementById('admin-name').textContent = Auth.adminUser.name || Auth.adminUser.email;
+      }
+      
+      // Populate Bot Switcher before active tab loads
+      await populateGlobalBotSwitcher();
+      
+      // Auto-load view based on URL hash
+      const hash = window.location.hash.substring(1) || 'dashboard';
+      switchTab(hash);
+
+      // Bind sidebar links
+      document.querySelectorAll('.menu-items li[data-target]').forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.preventDefault();
+          const target = item.getAttribute('data-target');
+          window.location.hash = target;
+          switchTab(target);
+          
+          // Close mobile drawer on item click
+          document.getElementById('sidebar').classList.remove('open');
+        });
+      });
+
+      // Sidebar toggle with overlay
+      const sidebarEl = document.getElementById('sidebar');
+      const overlayEl = document.getElementById('sidebar-overlay');
+
+      function openSidebar() {
+        sidebarEl.classList.add('open');
+        overlayEl.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      }
+      function closeSidebar() {
+        sidebarEl.classList.remove('open');
+        overlayEl.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+      function toggleSidebar() {
+        sidebarEl.classList.contains('open') ? closeSidebar() : openSidebar();
+      }
+
+      document.getElementById('sidebar-toggle').addEventListener('click', toggleSidebar);
+
+      // Close sidebar when overlay is tapped
+      overlayEl.addEventListener('click', closeSidebar);
+
+      // Close sidebar when a menu link is clicked (mobile)
+      document.querySelectorAll('.menu-items a').forEach(link => {
+        link.addEventListener('click', () => {
+          if (window.innerWidth <= 1024) closeSidebar();
+        });
+      });
+
+      // Close on Escape key
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeSidebar();
+          // Also close any open modals safely
+          const activeBackdrop = document.querySelector('.modal-backdrop.active');
+          if (activeBackdrop) {
+            const modalId = activeBackdrop.id.replace('modal-', '');
+            closeModal(modalId);
+          }
+        }
+      });
+
+      // Bind logout
+      document.getElementById('menu-logout').addEventListener('click', async (e) => {
+        e.preventDefault();
+        const confirmed = await Confirm.show({
+          title: 'Sign Out?',
+          message: 'Are you sure you want to sign out of the admin panel?',
+          confirmText: 'Sign Out',
+          cancelText: 'Stay',
+          type: 'warning'
+        });
+        if (confirmed) {
+          Auth.logout();
+        }
+      });
+    });
+
+    // Listen to hash changes for browser forward/backward navigation
+    window.addEventListener('hashchange', () => {
+      const target = window.location.hash.substring(1);
+      if (target) {
+        switchTab(target);
+      }
+    });
+
+    function switchTab(tabId) {
+      // 1. Hide all panels
+      document.querySelectorAll('.panel').forEach(panel => {
+        panel.classList.remove('active');
+      });
+
+      // 2. Remove active state from menu
+      document.querySelectorAll('.menu-items li').forEach(li => {
+        li.classList.remove('active');
+      });
+
+      // 3. Show targeted panel
+      const targetPanel = document.getElementById(`panel-${tabId}`);
+      if (targetPanel) {
+        targetPanel.classList.add('active');
+      }
+
+      // 4. Highlight active menu
+      const activeMenuItem = document.querySelector(`.menu-items li[data-target="${tabId}"]`);
+      if (activeMenuItem) {
+        activeMenuItem.classList.add('active');
+      }
+
+      // 5. Update top-bar title (nice casing)
+      const titleElement = document.getElementById('topbar-title');
+      if (titleElement) {
+        titleElement.textContent = tabId
+          .replace(/-/g, ' ')
+          .replace(/\b\w/g, c => c.toUpperCase());
+      }
+
+      // 6. Trigger specific panel loader hooks
+      const eventName = `load-${tabId}`;
+      window.dispatchEvent(new CustomEvent(eventName));
+    }
+
+    // Modal Helpers — open, close, backdrop-click-to-close, scroll lock, focus trapping & restoration
+    let lastActiveElement = null;
+
+    function serializeModalInputs(modalEl) {
+      const inputs = modalEl.querySelectorAll('input, select, textarea');
+      const state = {};
+      inputs.forEach(input => {
+        if (!input.id && !input.name) return;
+        const key = input.id || input.name;
+        if (input.type === 'checkbox' || input.type === 'radio') {
+          state[key] = input.checked;
+        } else {
+          state[key] = input.value;
+        }
+      });
+      return JSON.stringify(state);
+    }
+
+    function trapFocus(e, modalEl) {
+      if (e.key !== 'Tab') return;
+      const focusables = modalEl.querySelectorAll('a[href], area[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), iframe, object, embed, [tabindex="0"], [contenteditable]');
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          last.focus();
+          e.preventDefault();
+        }
+      } else {
+        if (document.activeElement === last) {
+          first.focus();
+          e.preventDefault();
+        }
+      }
+    }
+
+    window.openModal = function(modalId) {
+      const el = document.getElementById(`modal-${modalId}`);
+      if (!el) return;
+      
+      lastActiveElement = document.activeElement;
+      
+      el.classList.add('active');
+      document.body.style.overflow = 'hidden';
+      
+      const firstInput = el.querySelector('input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])');
+      if (firstInput) {
+        setTimeout(() => firstInput.focus(), 50);
+      }
+      
+      setTimeout(() => {
+        el._initialState = serializeModalInputs(el);
+      }, 100);
+      
+      el._focusTrap = (e) => trapFocus(e, el);
+      el.addEventListener('keydown', el._focusTrap);
+    };
+
+    window.closeModal = async function(modalId, force = false) {
+      const el = document.getElementById(`modal-${modalId}`);
+      if (!el) return;
+
+      if (!force && el._initialState) {
+        const currentState = serializeModalInputs(el);
+        if (currentState !== el._initialState) {
+          const discard = await Confirm.show({
+            title: 'Discard Changes?',
+            message: 'You have unsaved changes. Are you sure you want to discard them?',
+            confirmText: 'Discard',
+            cancelText: 'Keep Editing',
+            type: 'warning'
+          });
+          if (!discard) return;
+        }
+      }
+
+      el.classList.remove('active');
+      
+      if (el._focusTrap) {
+        el.removeEventListener('keydown', el._focusTrap);
+        delete el._focusTrap;
+      }
+      delete el._initialState;
+
+      const anyOpen = document.querySelector('.modal-backdrop.active');
+      if (!anyOpen) document.body.style.overflow = '';
+      
+      if (lastActiveElement) {
+        lastActiveElement.focus();
+        lastActiveElement = null;
+      }
+    };
+
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('modal-backdrop') && e.target.classList.contains('active')) {
+        const modalId = e.target.id.replace('modal-', '');
+        closeModal(modalId);
+      }
+    });
+  </script>
+</body>
+</html>
