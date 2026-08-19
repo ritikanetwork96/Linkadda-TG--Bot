@@ -525,16 +525,11 @@ export async function showSettingsMenu(ctx) {
     if (seq) seqTitle = seq.title;
   }
 
-  const text = `⚙️ <b>START BEHAVIOUR CONFIG</b>\n\n` +
-    `Choose what happens when a normal user starts the User Bot without a deep link parameter:\n\n` +
-    `<b>Current setting:</b> <u>${labelMap[behaviour] || 'N/A'}</u>\n` +
-    `<b>Active Sequence:</b> <u>${seqTitle}</u>\n\n` +
-    `<b>Behaviour Explanations:</b>\n` +
-    `• <b>Welcome Message Only</b>\n  → User receives only the configured welcome message.\n` +
-    `• <b>Welcome + Main Menu</b>\n  → User receives welcome message and interactive folder navigation buttons.\n` +
-    `• <b>Welcome + Configured Content</b>\n  → User receives welcome message and active start-content library items.\n` +
-    `• <b>Configured Sequence</b>\n  → User receives the selected Content Sequence onboarding flow.\n` +
-    `• <b>Disabled</b>\n  → Bot remains completely silent (sends no response).`;
+  const text = `⚙️ <b>Start Behaviour Configuration</b>\n\n` +
+    `Choose what happens when a new user starts your bot:\n\n` +
+    `• <b>Current Behaviour:</b> <u>${labelMap[behaviour] || 'N/A'}</u>\n` +
+    `• <b>Active Sequence:</b> <u>${seqTitle}</u>\n\n` +
+    `👇 <i>Select a behaviour below to update:</i>`;
 
   const markup = {
     inline_keyboard: [
