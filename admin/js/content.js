@@ -71,30 +71,47 @@ async function loadContentList() {
       return;
     }
 
-    tableBody.innerHTML = items.map(item => `
-      <tr>
-        <td><input type="checkbox" class="content-row-select" data-id="${item._id}" style="accent-color:var(--primary)"></td>
-        <td>
-          <div style="font-weight:600;color:var(--text)">${escapeHTML(item.title)}</div>
-          <small class="text-dim">${escapeHTML(item.originalFileName || item.url || 'Text content')}</small>
-        </td>
-        <td><span class="badge badge-info">${escapeHTML(item.type)}</span></td>
-        <td class="text-muted">${item.categoryId ? escapeHTML(item.categoryId.name) : '<span class="text-dim">—</span>'}</td>
-        <td><span class="badge ${item.status === 'active' ? 'badge-success' : 'badge-neutral'}">${escapeHTML(item.status)}</span></td>
-        <td>
-          ${item.isStartContent ? '<span class="badge badge-info">Start</span>' : ''}
-          ${item.isFeatured    ? '<span class="badge badge-warning">Featured</span>' : ''}
-          ${!item.isStartContent && !item.isFeatured ? '<span class="text-dim">—</span>' : ''}
-        </td>
-        <td>
-          <div class="d-flex gap-2">
-            <button class="btn btn-secondary btn-sm edit-content-btn" data-id="${item._id}" title="Edit">Edit</button>
-            <button class="btn btn-secondary btn-sm copy-link-btn"    data-id="${item._id}" title="Copy Link">Copy Link</button>
-            <button class="btn btn-danger btn-sm delete-content-btn"  data-id="${item._id}" data-title="${escapeHTML(item.title)}" title="Delete">Delete</button>
-          </div>
-        </td>
-      </tr>
-    `).join('');
+    tableBody.innerHTML = items.map(item => {
+      let previewHtml = '';
+      if (item.type === 'photo' && item.downloadUrl) {
+        previewHtml = `<img src="${item.downloadUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid rgba(255,255,255,0.1)">`;
+      } else if (item.type === 'video' && item.downloadUrl) {
+        previewHtml = `<video src="${item.downloadUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid rgba(255,255,255,0.1)" muted preload="metadata"></video>`;
+      } else {
+        const icon = item.type === 'link' ? '🔗' : item.type === 'text' ? '📝' : '📁';
+        previewHtml = `<div style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.05);border-radius:4px;font-size:1.1rem">${icon}</div>`;
+      }
+
+      return `
+        <tr>
+          <td><input type="checkbox" class="content-row-select" data-id="${item._id}" style="accent-color:var(--primary)"></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:12px">
+              ${previewHtml}
+              <div>
+                <div style="font-weight:600;color:var(--text)">${escapeHTML(item.title)}</div>
+                <small class="text-dim">${escapeHTML(item.originalFileName || item.url || 'Text content')}</small>
+              </div>
+            </div>
+          </td>
+          <td><span class="badge badge-info">${escapeHTML(item.type)}</span></td>
+          <td class="text-muted">${item.categoryId ? escapeHTML(item.categoryId.name) : '<span class="text-dim">—</span>'}</td>
+          <td><span class="badge ${item.status === 'active' ? 'badge-success' : 'badge-neutral'}">${escapeHTML(item.status)}</span></td>
+          <td>
+            ${item.isStartContent ? '<span class="badge badge-info">Start</span>' : ''}
+            ${item.isFeatured    ? '<span class="badge badge-warning">Featured</span>' : ''}
+            ${!item.isStartContent && !item.isFeatured ? '<span class="text-dim">—</span>' : ''}
+          </td>
+          <td>
+            <div class="d-flex gap-2">
+              <button class="btn btn-secondary btn-sm edit-content-btn" data-id="${item._id}" title="Edit">Edit</button>
+              <button class="btn btn-secondary btn-sm copy-link-btn"    data-id="${item._id}" title="Copy Link">Copy Link</button>
+              <button class="btn btn-danger btn-sm delete-content-btn"  data-id="${item._id}" data-title="${escapeHTML(item.title)}" title="Delete">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
 
     // Bind checkboxes
     tableBody.querySelectorAll('.content-row-select').forEach(chk =>

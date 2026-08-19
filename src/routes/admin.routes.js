@@ -786,9 +786,21 @@ router.get('/content', authMiddleware, async (req, res, next) => {
       .skip((page - 1) * limit)
       .limit(limit);
 
+    const mappedContent = await Promise.all(content.map(async (c) => {
+      const obj = c.toObject();
+      if (obj.storageKey) {
+        try {
+          obj.downloadUrl = await storageService.generatePresignedDownloadUrl(obj.storageKey, 86400);
+        } catch (err) {
+          console.error(`S3 Service: Failed to sign preview for key ${obj.storageKey}:`, err.message);
+        }
+      }
+      return obj;
+    }));
+
     return res.json({
       status: 'success',
-      content,
+      content: mappedContent,
       pagination: {
         total,
         page,

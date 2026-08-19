@@ -3449,7 +3449,7 @@ export async function handleAdminMessage(ctx) {
       });
     }
 
-    if (textMsg === '⚙️ Settings') {
+    if (textMsg === '⚙️ Settings' || textMsg === '⚙ Settings' || textMsg.toLowerCase() === '/settings') {
       ctx.update.callback_query = { data: 'admin:set:start:menu', id: 'settings_cb_' + Date.now() };
       return handleAdminCallback(ctx);
     }
