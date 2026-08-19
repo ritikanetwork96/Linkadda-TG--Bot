@@ -47,27 +47,39 @@ app.use(helmet({
 }));
 
 // 2. CORS configuration (allowing credentials for authorized origins only)
-app.use(cors({
-  origin: (origin, callback) => {
-    // If request is same-origin (origin is undefined)
-    if (!origin) {
-      return callback(null, true);
-    }
-    // Allow localhost/127.0.0.1 in development to enable local debugging tools
-    const isLocal = config.nodeEnv !== 'production' && (
-      origin.startsWith('http://localhost:') || 
-      origin.startsWith('http://127.0.0.1:')
-    );
+app.use(cors((req, callback) => {
+  const origin = req.header('Origin');
+  let corsOptions = {
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Request-ID']
+  };
 
-    if (isLocal || (config.adminOrigin && origin === config.adminOrigin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Blocked by CORS policy: Unauthorized Origin.'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Request-ID']
+  // If same-origin (no Origin header) or request is coming from our own host, allow it
+  const host = req.header('Host');
+  const isSameHost = origin && host && origin.includes(host);
+
+  if (!origin || isSameHost) {
+    corsOptions.origin = true;
+    return callback(null, corsOptions);
+  }
+
+  // Normalize origins (remove trailing slashes)
+  const cleanOrigin = origin.replace(/\/$/, '');
+  const cleanAdminOrigin = (config.adminOrigin || '').replace(/\/$/, '');
+
+  const isLocal = config.nodeEnv !== 'production' && (
+    cleanOrigin.startsWith('http://localhost:') || 
+    cleanOrigin.startsWith('http://127.0.0.1:')
+  );
+
+  if (isLocal || (cleanAdminOrigin && cleanOrigin === cleanAdminOrigin)) {
+    corsOptions.origin = true;
+  } else {
+    corsOptions.origin = false; // Disallow CORS but do not throw 500 server exception
+  }
+
+  callback(null, corsOptions);
 }));
 
 // 3. Global Request Limiter (excluding assets / static files)
