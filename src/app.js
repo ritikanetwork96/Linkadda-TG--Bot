@@ -3,6 +3,8 @@ import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { rateLimit } from 'express-rate-limit';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { config } from './config/env.js';
 import healthRoutes from './routes/health.routes.js';
 import adminRoutes from './routes/admin.routes.js';
@@ -10,6 +12,9 @@ import linkRoutes from './routes/link.routes.js';
 import { errorMiddleware } from './middleware/error.middleware.js';
 import { requestIdMiddleware } from './middleware/request-id.middleware.js';
 import { logger } from './config/logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -110,7 +115,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // 5. Serve Admin Static Panel
-app.use('/admin', express.static('admin'));
+app.use('/admin', express.static(path.resolve(__dirname, '../admin')));
 
 // 6. Routes
 app.use('/', healthRoutes);
