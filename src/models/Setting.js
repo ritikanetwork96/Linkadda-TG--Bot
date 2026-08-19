@@ -6,6 +6,14 @@ const settingSchema = new mongoose.Schema(
       type: String,
       default: 'Welcome.',
     },
+    botDescription: {
+      type: String,
+      default: '',
+    },
+    botShortDescription: {
+      type: String,
+      default: '',
+    },
     startBehaviour: {
       type: String,
       enum: ['WELCOME_ONLY', 'WELCOME_MENU', 'CONFIGURED_CONTENT', 'CONFIGURED_SEQUENCE', 'DISABLED'],

@@ -133,7 +133,11 @@ router.post('/auth/login', async (req, res, next) => {
       maxAge: 8 * 60 * 60 * 1000, // 8 hours
     });
 
-    await ActivityLog.log('Admin login', admin._id, 'success', { email: admin.email });
+    await ActivityLog.log('Admin login', admin._id, 'success', { 
+      email: admin.email,
+      ip: req.ip,
+      userAgent: req.headers['user-agent']
+    });
 
     return res.json({
       status: 'success',
@@ -1184,11 +1188,51 @@ router.patch('/settings', authMiddleware, async (req, res, next) => {
     if (helpMessage !== undefined) settings.helpMessage = helpMessage;
     if (supportLink !== undefined) settings.supportLink = supportLink;
 
+    if (req.body.botDescription !== undefined) {
+      settings.botDescription = req.body.botDescription;
+      try {
+        await telegramService.client.setMyDescription(req.body.botDescription);
+      } catch (err) {
+        console.error('Failed to update bot description on Telegram:', err.message);
+      }
+    }
+    if (req.body.botShortDescription !== undefined) {
+      settings.botShortDescription = req.body.botShortDescription;
+      try {
+        await telegramService.client.setMyShortDescription(req.body.botShortDescription);
+      } catch (err) {
+        console.error('Failed to update bot short description on Telegram:', err.message);
+      }
+    }
+
     await settings.save();
 
     await ActivityLog.log('Settings changed', adminId, 'success', req.body);
 
     return res.json({ status: 'success', settings });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /system/sessions - Retrieve recent login locations
+router.get('/system/sessions', authMiddleware, async (req, res, next) => {
+  try {
+    const sessions = await ActivityLog.find({ action: 'Admin login', status: 'success' })
+      .populate('adminId', 'name email')
+      .sort({ timestamp: -1 })
+      .limit(10);
+
+    const mappedSessions = sessions.map(s => ({
+      _id: s._id,
+      timestamp: s.timestamp,
+      email: s.metadata?.email || (s.adminId ? s.adminId.email : 'Unknown'),
+      name: s.adminId ? s.adminId.name : 'Administrator',
+      ip: s.metadata?.ip || 'N/A',
+      userAgent: s.metadata?.userAgent || 'N/A'
+    }));
+
+    return res.json({ status: 'success', sessions: mappedSessions });
   } catch (error) {
     next(error);
   }
