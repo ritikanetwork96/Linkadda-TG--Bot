@@ -128,7 +128,7 @@ export async function renderHome(ctx, edit = false) {
       [{ text: '📂 Categories', callback_data: 'admin:cat:list' }, { text: '🎬 Media Library', callback_data: 'admin:content:list' }],
       [{ text: '🔗 Access Links', callback_data: 'admin:pack:list' }, { text: '📦 Content Sequences', callback_data: 'admin:seq:list' }],
       [{ text: '➕ Create Sequence', callback_data: 'admin:seq:create' }, { text: '📢 Broadcast', callback_data: 'admin:seq:bc:menu' }],
-      [{ text: '📊 Analytics', callback_data: 'admin:stats:30' }, { text: '🩺 System Health', callback_data: 'admin:health' }],
+      [{ text: '👥 Users', callback_data: 'admin:users:list:1' }, { text: '📊 Analytics', callback_data: 'admin:stats:30' }],
       [{ text: '⚙️ Settings', callback_data: 'admin:set:start:menu' }, { text: '📤 Publish Forwarded', callback_data: 'admin:pub:start' }],
       [{ text: '🔄 Refresh', callback_data: 'admin:refresh' }, { text: '🚪 Logout', callback_data: 'admin:logout' }],
       [{ text: '🧪 Load Demo Data', callback_data: 'admin:demo:seed' }, { text: '🗑 Clear Demo', callback_data: 'admin:demo:clear' }]
@@ -138,6 +138,65 @@ export async function renderHome(ctx, edit = false) {
   if (edit) {
     await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: markup }).catch(() => {});
   } else {
+    await ctx.reply(text, { parse_mode: 'HTML', reply_markup: markup }).catch(() => {});
+  }
+}
+
+/**
+ * Paginated users list for admin
+ */
+async function renderUsersList(ctx, page = 1) {
+  const LIMIT = 10;
+  const skip = (page - 1) * LIMIT;
+  const botId = ctx.state.botId;
+
+  const total = await User.countDocuments({ botId });
+  const activeCount = await User.countDocuments({ botId, status: 'active' });
+  const users = await User.find({ botId })
+    .sort({ lastActiveAt: -1 })
+    .skip(skip)
+    .limit(LIMIT)
+    .lean();
+
+  if (users.length === 0 && page === 1) {
+    const text = `👥 <b>Users</b>\n\nAbhi tak koi user nahi aaya bot par.`;
+    return ctx.reply(text, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [[{ text: '🏠 Home', callback_data: 'admin:home' }]] }
+    }).catch(() => {});
+  }
+
+  const totalPages = Math.ceil(total / LIMIT);
+
+  let text = `👥 <b>Users</b> (Page ${page}/${totalPages})\n`;
+  text += `📊 Total: <b>${total}</b>  |  🟢 Active: <b>${activeCount}</b>\n`;
+  text += `──────────────────\n`;
+
+  for (const u of users) {
+    const name = [u.firstName, u.lastName].filter(Boolean).join(' ') || 'No Name';
+    const handle = u.username ? `@${u.username}` : `ID: ${u.telegramUserId}`;
+    const status = u.status === 'active' ? '🟢' : u.status === 'blocked' ? '🔴' : '⚪';
+    const lastSeen = u.lastActiveAt
+      ? new Date(u.lastActiveAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+      : 'N/A';
+    text += `\n${status} <b>${escapeHtml(name)}</b>  ${escapeHtml(handle)}\n`;
+    text += `   Last seen: ${lastSeen}\n`;
+  }
+
+  const navButtons = [];
+  if (page > 1) navButtons.push({ text: '⬅️ Pehle', callback_data: `admin:users:list:${page - 1}` });
+  if (page < totalPages) navButtons.push({ text: 'Agle ➡️', callback_data: `admin:users:list:${page + 1}` });
+
+  const markup = {
+    inline_keyboard: [
+      ...(navButtons.length ? [navButtons] : []),
+      [{ text: '🏠 Home', callback_data: 'admin:home' }]
+    ]
+  };
+
+  try {
+    await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: markup });
+  } catch {
     await ctx.reply(text, { parse_mode: 'HTML', reply_markup: markup }).catch(() => {});
   }
 }
@@ -571,6 +630,12 @@ export async function handleAdminCallback(ctx) {
     ctx.state.settings = await getCachedSettings(ctx.state.botId);
 
     const session = await AdminSession.getSession(adminId);
+
+    // ── Users List ─────────────────────────────────────────────────────────────
+    if (data.startsWith('admin:users:list:')) {
+      const page = parseInt(data.split(':')[3], 10) || 1;
+      return renderUsersList(ctx, page);
+    }
 
     // ── Admin Multi-Media Link Callbacks ─────────────────────────────────────
     if (data.startsWith('admin:link:')) {
