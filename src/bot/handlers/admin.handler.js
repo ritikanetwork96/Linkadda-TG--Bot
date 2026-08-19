@@ -508,6 +508,52 @@ async function renderSequenceComposer(ctx, session, edit = true, sequenceId = nu
   }
 }
 
+export async function showSettingsMenu(ctx) {
+  const settings = ctx.state.settings || {};
+  const behaviour = settings.startBehaviour || 'WELCOME_ONLY';
+  const labelMap = {
+    'WELCOME_ONLY': '🟢 Welcome Message Only',
+    'WELCOME_MENU': '🟢 Welcome + Main Menu',
+    'CONFIGURED_CONTENT': '🟢 Welcome + Configured Content',
+    'CONFIGURED_SEQUENCE': '🟢 Configured Sequence',
+    'DISABLED': '🔴 Disabled'
+  };
+
+  let seqTitle = 'None';
+  if (settings.startSequenceId) {
+    const seq = await ContentSequence.findById(settings.startSequenceId);
+    if (seq) seqTitle = seq.title;
+  }
+
+  const text = `⚙️ <b>START BEHAVIOUR CONFIG</b>\n\n` +
+    `Choose what happens when a normal user starts the User Bot without a deep link parameter:\n\n` +
+    `<b>Current setting:</b> <u>${labelMap[behaviour] || 'N/A'}</u>\n` +
+    `<b>Active Sequence:</b> <u>${seqTitle}</u>\n\n` +
+    `<b>Behaviour Explanations:</b>\n` +
+    `• <b>Welcome Message Only</b>\n  → User receives only the configured welcome message.\n` +
+    `• <b>Welcome + Main Menu</b>\n  → User receives welcome message and interactive folder navigation buttons.\n` +
+    `• <b>Welcome + Configured Content</b>\n  → User receives welcome message and active start-content library items.\n` +
+    `• <b>Configured Sequence</b>\n  → User receives the selected Content Sequence onboarding flow.\n` +
+    `• <b>Disabled</b>\n  → Bot remains completely silent (sends no response).`;
+
+  const markup = {
+    inline_keyboard: [
+      [{ text: 'Welcome Only', callback_data: 'admin:set:start:select:WELCOME_ONLY' }, { text: 'Welcome + Menu', callback_data: 'admin:set:start:select:WELCOME_MENU' }],
+      [{ text: 'Configured Content', callback_data: 'admin:set:start:select:CONFIGURED_CONTENT' }, { text: 'Configured Sequence', callback_data: 'admin:set:start:select:CONFIGURED_SEQUENCE' }],
+      [{ text: 'Disabled', callback_data: 'admin:set:start:select:DISABLED' }],
+      [{ text: '⚙️ Configure Sequence Onboarding', callback_data: 'admin:set:start:sequence:list:1' }],
+      [{ text: '⚙️ Configure /start Content', callback_data: 'admin:set:start:content:list:1' }],
+      [{ text: '⬅️ Back to Control Center', callback_data: 'admin:home' }]
+    ]
+  };
+
+  try {
+    await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: markup });
+  } catch (err) {
+    await ctx.reply(text, { parse_mode: 'HTML', reply_markup: markup }).catch(() => {});
+  }
+}
+
 /**
  * Callback query router for Admin-prefixed operations
  */
@@ -2533,50 +2579,7 @@ export async function handleAdminCallback(ctx) {
 
     // ── Start Behaviour Menu ──
     if (data === 'admin:set:start:menu') {
-      const settings = ctx.state.settings || {};
-      const behaviour = settings.startBehaviour || 'WELCOME_ONLY';
-      const labelMap = {
-        'WELCOME_ONLY': '🟢 Welcome Message Only',
-        'WELCOME_MENU': '🟢 Welcome + Main Menu',
-        'CONFIGURED_CONTENT': '🟢 Welcome + Configured Content',
-        'CONFIGURED_SEQUENCE': '🟢 Configured Sequence',
-        'DISABLED': '🔴 Disabled'
-      };
-
-      let seqTitle = 'None';
-      if (settings.startSequenceId) {
-        const seq = await ContentSequence.findById(settings.startSequenceId);
-        if (seq) seqTitle = seq.title;
-      }
-
-      const text = `⚙️ <b>START BEHAVIOUR CONFIG</b>\n\n` +
-        `Choose what happens when a normal user starts the User Bot without a deep link parameter:\n\n` +
-        `<b>Current setting:</b> <u>${labelMap[behaviour] || 'N/A'}</u>\n` +
-        `<b>Active Sequence:</b> <u>${seqTitle}</u>\n\n` +
-        `<b>Behaviour Explanations:</b>\n` +
-        `• <b>Welcome Message Only</b>\n  → User receives only the configured welcome message.\n` +
-        `• <b>Welcome + Main Menu</b>\n  → User receives welcome message and interactive folder navigation buttons.\n` +
-        `• <b>Welcome + Configured Content</b>\n  → User receives welcome message and active start-content library items.\n` +
-        `• <b>Configured Sequence</b>\n  → User receives the selected Content Sequence onboarding flow.\n` +
-        `• <b>Disabled</b>\n  → Bot remains completely silent (sends no response).`;
-
-      const markup = {
-        inline_keyboard: [
-          [{ text: 'Welcome Only', callback_data: 'admin:set:start:select:WELCOME_ONLY' }, { text: 'Welcome + Menu', callback_data: 'admin:set:start:select:WELCOME_MENU' }],
-          [{ text: 'Configured Content', callback_data: 'admin:set:start:select:CONFIGURED_CONTENT' }, { text: 'Configured Sequence', callback_data: 'admin:set:start:select:CONFIGURED_SEQUENCE' }],
-          [{ text: 'Disabled', callback_data: 'admin:set:start:select:DISABLED' }],
-          [{ text: '⚙️ Configure Sequence Onboarding', callback_data: 'admin:set:start:sequence:list:1' }],
-          [{ text: '⚙️ Configure /start Content', callback_data: 'admin:set:start:content:list:1' }],
-          [{ text: '⬅️ Back to Control Center', callback_data: 'admin:home' }]
-        ]
-      };
-
-      try {
-        await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: markup });
-      } catch (err) {
-        await ctx.reply(text, { parse_mode: 'HTML', reply_markup: markup }).catch(() => {});
-      }
-      return;
+      return showSettingsMenu(ctx);
     }
 
     if (data.startsWith('admin:set:start:select:')) {
@@ -3457,8 +3460,7 @@ export async function handleAdminMessage(ctx) {
     }
 
     if (textMsg === '⚙️ Settings' || textMsg === '⚙ Settings' || textMsg.toLowerCase() === '/settings') {
-      ctx.update.callback_query = { data: 'admin:set:start:menu', id: 'settings_cb_' + Date.now() };
-      return handleAdminCallback(ctx);
+      return showSettingsMenu(ctx);
     }
 
     if (session.state === 'LINK_DRAFT_ADD' || (session.state === 'IDLE' && (ctx.message?.photo || ctx.message?.video || ctx.message?.document || (ctx.message?.text && !textMsg.startsWith('/'))))) {
