@@ -722,18 +722,27 @@ export async function handleAdminCallback(ctx) {
       }
 
       if (action === 'dir_publish' && parts[3] === 'run') {
+        // ── Idempotency lock via session state ──
+        if (session.state === 'PUBLISHING') {
+          return ctx.answerCbQuery('⚠️ Broadcast already in progress. Please wait.', { show_alert: true });
+        }
         if (!session.linkDraft || !session.linkDraft.items || session.linkDraft.items.length === 0) {
           return ctx.reply('⚠️ No items to publish.').catch(() => {});
         }
 
         const deleteAt = session.linkDraft.expiresAt || null;
-        const items = session.linkDraft.items;
+        const items = [...session.linkDraft.items]; // snapshot before clearing
+
+        // Lock immediately & clear draft so replay does nothing
+        session.state = 'PUBLISHING';
+        session.linkDraft = { status: 'idle', items: [], expiresAt: null, updatedAt: new Date() };
+        await session.save();
 
         await ctx.reply('⏳ Broadcasting post to active users...').catch(() => {});
 
         (async () => {
           try {
-            const activeUsers = await User.find({ status: 'active' });
+            const activeUsers = await User.find({ botId: ctx.state.botId, status: 'active' });
             
             let success = 0;
             let failed = 0;
@@ -776,12 +785,12 @@ export async function handleAdminCallback(ctx) {
             console.log(`Direct broadcast finished. Success: ${success}, Failed: ${failed}`);
           } catch (err) {
             console.error('Direct broadcast background job error:', err.message);
+          } finally {
+            // Reset session state after broadcast finishes
+            const s = await AdminSession.getSession(adminId);
+            if (s.state === 'PUBLISHING') { s.state = 'IDLE'; await s.save(); }
           }
         })();
-
-        session.linkDraft = { status: 'idle', items: [], expiresAt: null, updatedAt: new Date() };
-        session.state = 'IDLE';
-        await session.save();
 
         await ctx.reply('🚀 <b>Broadcast Sent Successfully</b>\n\nAll messages have been queued for active users and will auto-delete at the scheduled time.', { parse_mode: 'HTML' }).catch(() => {});
         return;
@@ -1134,9 +1143,17 @@ export async function handleAdminCallback(ctx) {
       }
 
       if (action === 'run') {
-        if (pack.status !== 'PENDING') {
-          return ctx.answerCbQuery('⚠️ This post is already published or is no longer pending.', { show_alert: true });
+        // ── Atomic idempotency lock — prevents double-fire if callback replays ──
+        const lockedPack = await ContentPack.findOneAndUpdate(
+          { _id: pack._id, status: 'PENDING' },
+          { $set: { status: 'publishing', publishedAt: new Date() } },
+          { new: true }
+        );
+        if (!lockedPack) {
+          return ctx.answerCbQuery('⚠️ Yeh post pehle hi publish ho chuki hai.', { show_alert: true });
         }
+        // Work with the locked pack from here
+        Object.assign(pack, lockedPack.toObject());
 
         const mode = pack.settings?.mode || 'direct';
 
@@ -1159,6 +1176,8 @@ export async function handleAdminCallback(ctx) {
             if (progressMsg) {
               await ctx.telegram.deleteMessage(ctx.chat.id, progressMsg.message_id).catch(() => {});
             }
+            // Rollback lock
+            await ContentPack.updateOne({ _id: pack._id }, { $set: { status: 'PENDING' } }).catch(() => {});
             return ctx.answerCbQuery(`❌ S3 Upload failed: ${err.message}. Please forward/send media again.`, { show_alert: true });
           }
           if (progressMsg) {
