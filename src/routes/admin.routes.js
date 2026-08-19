@@ -1942,11 +1942,18 @@ router.get('/system/info', authMiddleware, async (req, res, next) => {
   }
 });
 
-// 7. MULTI-BOT CRUD & TESTING CONTROLLER
 router.get('/bots', authMiddleware, async (req, res, next) => {
   try {
-    const bots = await BotModel.find({}).select('-token'); // Exclude encrypted token values
-    res.json({ status: 'success', bots });
+    const bots = await BotModel.find({}).select('-encryptedToken');
+    const mappedBots = bots.map(b => ({
+      _id: b._id,
+      telegramBotId: b.telegramBotId,
+      username: b.username,
+      displayName: b.firstName,
+      status: b.status,
+      createdAt: b.createdAt
+    }));
+    res.json({ status: 'success', bots: mappedBots });
   } catch (err) {
     next(err);
   }
@@ -1959,19 +1966,43 @@ router.post('/bots', authMiddleware, async (req, res, next) => {
       return res.status(400).json({ status: 'error', message: 'Display name and token are required.' });
     }
 
-    // Encrypt token
+    // 1. Verify token immediately with Telegram API
+    const { Telegraf } = await import('telegraf');
+    const tempBot = new Telegraf(token);
+    let botInfo;
+    try {
+      botInfo = await tempBot.telegram.getMe();
+    } catch (apiErr) {
+      return res.status(400).json({ status: 'error', message: `Invalid bot token. Telegram API error: ${apiErr.message}` });
+    }
+
+    // 2. Encrypt token
     const encryptedToken = encrypt(token);
 
+    // 3. Create bot configuration in DB matching the schema
     const bot = await BotModel.create({
-      displayName,
-      token: encryptedToken,
+      telegramBotId: botInfo.id,
+      username: botInfo.username,
+      firstName: displayName || botInfo.first_name || 'Bot',
+      encryptedToken,
       status: 'disconnected'
     });
 
-    await ActivityLog.log('Bot configuration added', req.admin.id, 'success', { botId: bot._id, displayName });
+    await ActivityLog.log('Bot configuration added', req.admin.id, 'success', { botId: bot._id, displayName: bot.firstName });
 
-    res.status(201).json({ status: 'success', bot: { _id: bot._id, displayName, status: bot.status } });
+    res.status(201).json({ 
+      status: 'success', 
+      bot: { 
+        _id: bot._id, 
+        displayName: bot.firstName, 
+        username: bot.username,
+        status: bot.status 
+      } 
+    });
   } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({ status: 'error', message: 'This bot token or ID is already registered.' });
+    }
     next(err);
   }
 });
@@ -1983,7 +2014,8 @@ router.post('/bots/:id/test', authMiddleware, async (req, res, next) => {
       return res.status(404).json({ status: 'error', message: 'Bot config not found.' });
     }
 
-    const decryptedToken = decrypt(botDoc.token);
+    const decryptedToken = decrypt(botDoc.encryptedToken);
+    const { Telegraf } = await import('telegraf');
     const tempBot = new Telegraf(decryptedToken);
     
     let botInfo;
@@ -2021,7 +2053,7 @@ router.patch('/bots/:id/activate', authMiddleware, async (req, res, next) => {
     await BotModel.updateMany({ _id: { $ne: botDoc._id } }, { $set: { status: 'disconnected' } });
 
     // Decrypt and hot-swap active bot token
-    const decryptedToken = decrypt(botDoc.token);
+    const decryptedToken = decrypt(botDoc.encryptedToken);
     const botInfo = await reinitializeBot(decryptedToken);
 
     botDoc.status = 'connected';

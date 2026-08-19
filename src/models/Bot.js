@@ -20,8 +20,8 @@ const botSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'inactive'],
-      default: 'active',
+      enum: ['connected', 'disconnected', 'error'],
+      default: 'disconnected',
       index: true,
     },
     encryptedToken: {
