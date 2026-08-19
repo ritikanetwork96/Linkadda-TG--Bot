@@ -1,32 +1,22 @@
 {
   "version": 2,
-  "cleanUrls": true,
-  "builds": [
+  "outputDirectory": "admin",
+  "routes": [
     {
-      "src": "admin/**",
-      "use": "@vercel/static"
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "https://linkadda-tg-bot.onrender.com/api/:path*"
+      "src": "/api/(.*)",
+      "dest": "https://linkadda-tg-bot.onrender.com/api/$1"
     },
     {
-      "source": "/l/:path*",
-      "destination": "https://linkadda-tg-bot.onrender.com/l/:path*"
+      "src": "/l/(.*)",
+      "dest": "https://linkadda-tg-bot.onrender.com/l/$1"
     },
     {
-      "source": "/login",
-      "destination": "/admin/login.html"
+      "src": "/login",
+      "dest": "/login.html"
     },
     {
-      "source": "/admin/:path*",
-      "destination": "/admin/:path*"
-    },
-    {
-      "source": "/((?!api|l|admin).*)",
-      "destination": "/admin/$1"
+      "src": "/(.*)",
+      "dest": "/$1"
     }
   ]
 }

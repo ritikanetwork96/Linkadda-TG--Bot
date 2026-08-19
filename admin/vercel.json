@@ -1,13 +1,25 @@
 {
-  "cleanUrls": true,
-  "rewrites": [
+  "version": 2,
+  "routes": [
     {
-      "source": "/api/:path*",
-      "destination": "https://linkadda-tg-bot.onrender.com/api/:path*"
+      "src": "/api/(.*)",
+      "dest": "https://linkadda-tg-bot.onrender.com/api/$1"
     },
     {
-      "source": "/l/:path*",
-      "destination": "https://linkadda-tg-bot.onrender.com/l/:path*"
+      "src": "/l/(.*)",
+      "dest": "https://linkadda-tg-bot.onrender.com/l/$1"
+    },
+    {
+      "src": "/login",
+      "dest": "/login.html"
+    },
+    {
+      "src": "^/$",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
     }
   ]
 }
