@@ -288,6 +288,7 @@ async function renderMediaLibrary(ctx, type = 'all', page = 1, edit = false) {
  * Core entry point for /start command sent by authorized admins
  */
 export async function handleAdminStart(ctx) {
+  if (!ctx.from) return;
   try {
     if (!ctx.state) ctx.state = {};
     ctx.state.botId = await resolveBotId();
@@ -511,6 +512,7 @@ async function renderSequenceComposer(ctx, session, edit = true, sequenceId = nu
  * Callback query router for Admin-prefixed operations
  */
 export async function handleAdminCallback(ctx) {
+  if (!ctx.from) return;
   const data = ctx.callbackQuery.data;
   const adminId = ctx.from.id;
 
@@ -3384,6 +3386,7 @@ export async function handleAdminCallback(ctx) {
  * Directs updates to state machine buffers based on the admin's active state.
  */
 export async function handleAdminMessage(ctx) {
+  if (!ctx.from) return;
   if (!isAdmin(ctx)) {
     return ctx.reply('Unauthorized. This is a private admin panel.').catch(() => {});
   }
