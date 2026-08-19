@@ -510,33 +510,30 @@ async function renderSequenceComposer(ctx, session, edit = true, sequenceId = nu
 
 export async function showSettingsMenu(ctx) {
   const settings = ctx.state.settings || {};
-  const behaviour = settings.startBehaviour || 'WELCOME_ONLY';
-  const labelMap = {
-    'WELCOME_ONLY': '🟢 Welcome Message Only',
-    'CONFIGURED_CONTENT': '🟢 Welcome + Configured Content',
-    'CONFIGURED_SEQUENCE': '🟢 Configured Sequence',
-    'DISABLED': '🔴 Disabled'
-  };
 
-  let seqTitle = 'None';
-  if (settings.startSequenceId) {
-    const seq = await ContentSequence.findById(settings.startSequenceId);
-    if (seq) seqTitle = seq.title;
-  }
+  // Show current welcome message preview (first 80 chars)
+  const welcomePreview = settings.welcomeMessage
+    ? settings.welcomeMessage.substring(0, 80) + (settings.welcomeMessage.length > 80 ? '...' : '')
+    : '(koi message set nahi hai)';
 
-  const text = `⚙️ <b>Start Behaviour Configuration</b>\n\n` +
-    `Choose what happens when a new user starts your bot:\n\n` +
-    `• <b>Current Behaviour:</b> <u>${labelMap[behaviour] || 'N/A'}</u>\n` +
-    `• <b>Active Sequence:</b> <u>${seqTitle}</u>\n\n` +
-    `👇 <i>Select a behaviour below to update:</i>`;
+  // Show current bot description preview
+  const descPreview = settings.botDescription
+    ? settings.botDescription.substring(0, 80) + (settings.botDescription.length > 80 ? '...' : '')
+    : '(koi message set nahi hai)';
+
+  const text =
+    `⚙️ <b>Settings</b>\n\n` +
+    `Edit karna chahte ho? Neeche se option chuniye:\n\n` +
+    `📩 <b>Welcome Message</b> (user /start dabaaye tab milta hai):\n` +
+    `<i>${escapeHtml(welcomePreview)}</i>\n\n` +
+    `🤖 <b>Start se pehle wala message</b> ("What can this bot do?"):\n` +
+    `<i>${escapeHtml(descPreview)}</i>`;
 
   const markup = {
     inline_keyboard: [
-      [{ text: 'Welcome Only', callback_data: 'admin:set:start:select:WELCOME_ONLY' }, { text: 'Configured Content', callback_data: 'admin:set:start:select:CONFIGURED_CONTENT' }],
-      [{ text: 'Configured Sequence', callback_data: 'admin:set:start:select:CONFIGURED_SEQUENCE' }, { text: 'Disabled', callback_data: 'admin:set:start:select:DISABLED' }],
-      [{ text: '⚙️ Configure Sequence Onboarding', callback_data: 'admin:set:start:sequence:list:1' }],
-      [{ text: '⚙️ Configure /start Content', callback_data: 'admin:set:start:content:list:1' }],
-      [{ text: '⬅️ Back to Control Center', callback_data: 'admin:home' }]
+      [{ text: '✏️ Welcome Message Edit Karo', callback_data: 'admin:set:edit:welcome' }],
+      [{ text: '✏️ Start se Pehle Wala Message Edit Karo', callback_data: 'admin:set:edit:desc' }],
+      [{ text: '🏠 Wapas Jao', callback_data: 'admin:home' }]
     ]
   };
 
@@ -545,6 +542,11 @@ export async function showSettingsMenu(ctx) {
   } catch (err) {
     await ctx.reply(text, { parse_mode: 'HTML', reply_markup: markup }).catch(() => {});
   }
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 /**
@@ -2570,9 +2572,45 @@ export async function handleAdminCallback(ctx) {
       return;
     }
 
-    // ── Start Behaviour Menu ──
+    // ── Settings Menu ──
     if (data === 'admin:set:start:menu') {
       return showSettingsMenu(ctx);
+    }
+
+    // ── Edit Welcome Message ──
+    if (data === 'admin:set:edit:welcome') {
+      const session = await AdminSession.getSession(adminId);
+      session.state = 'SETTINGS_EDIT_WELCOME';
+      await session.save();
+      const current = ctx.state.settings?.welcomeMessage || '';
+      await ctx.reply(
+        `✏️ <b>Welcome Message</b>\n\n` +
+        `Abhi jo message hai:\n<i>${escapeHtml(current) || '(khaali hai)'}</i>\n\n` +
+        `Naya message type karke bhejo. Jab user /start dabayega tab yahi message milega.`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: { inline_keyboard: [[{ text: '❌ Raho Waise Hi', callback_data: 'admin:set:start:menu' }]] }
+        }
+      ).catch(() => {});
+      return;
+    }
+
+    // ── Edit Bot Description ──
+    if (data === 'admin:set:edit:desc') {
+      const session = await AdminSession.getSession(adminId);
+      session.state = 'SETTINGS_EDIT_DESC';
+      await session.save();
+      const current = ctx.state.settings?.botDescription || '';
+      await ctx.reply(
+        `✏️ <b>Start se Pehle Wala Message</b>\n\n` +
+        `Abhi jo message hai:\n<i>${escapeHtml(current) || '(khaali hai)'}</i>\n\n` +
+        `Naya message type karke bhejo. Yeh Telegram par bot ke page par START dabaane se pehle dikhta hai.`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: { inline_keyboard: [[{ text: '❌ Raho Waise Hi', callback_data: 'admin:set:start:menu' }]] }
+        }
+      ).catch(() => {});
+      return;
     }
 
     if (data.startsWith('admin:set:start:select:')) {
@@ -3454,6 +3492,42 @@ export async function handleAdminMessage(ctx) {
 
     if (textMsg === '⚙️ Settings' || textMsg === '⚙ Settings' || textMsg.toLowerCase() === '/settings') {
       return showSettingsMenu(ctx);
+    }
+
+    // ── Settings: Save Welcome Message ──
+    if (session.state === 'SETTINGS_EDIT_WELCOME' && textMsg) {
+      try {
+        const settings = await Setting.getSettings(ctx.state.botId);
+        settings.welcomeMessage = textMsg;
+        await settings.save();
+        session.state = 'IDLE';
+        await session.save();
+        ctx.state.settings = settings;
+        await ctx.reply('✅ <b>Welcome Message save ho gaya!</b>\n\n<i>' + escapeHtml(textMsg.substring(0, 100)) + '</i>', { parse_mode: 'HTML' }).catch(() => {});
+        return showSettingsMenu(ctx);
+      } catch (err) {
+        await ctx.reply('❌ Save nahi hua. Dobara try karo.').catch(() => {});
+      }
+      return;
+    }
+
+    // ── Settings: Save Bot Description ──
+    if (session.state === 'SETTINGS_EDIT_DESC' && textMsg) {
+      try {
+        const settings = await Setting.getSettings(ctx.state.botId);
+        settings.botDescription = textMsg;
+        await settings.save();
+        // Push to Telegram
+        try { await ctx.telegram.setMyDescription(textMsg); } catch (_) {}
+        session.state = 'IDLE';
+        await session.save();
+        ctx.state.settings = settings;
+        await ctx.reply('✅ <b>Start se pehle wala message save ho gaya!</b>\n\n<i>' + escapeHtml(textMsg.substring(0, 100)) + '</i>', { parse_mode: 'HTML' }).catch(() => {});
+        return showSettingsMenu(ctx);
+      } catch (err) {
+        await ctx.reply('❌ Save nahi hua. Dobara try karo.').catch(() => {});
+      }
+      return;
     }
 
     if (session.state === 'LINK_DRAFT_ADD' || (session.state === 'IDLE' && (ctx.message?.photo || ctx.message?.video || ctx.message?.document || (ctx.message?.text && !textMsg.startsWith('/'))))) {
