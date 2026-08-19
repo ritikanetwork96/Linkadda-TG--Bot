@@ -518,12 +518,22 @@
       </div>
       <form id="settingsForm">
         <div class="settings-section">
-          <div class="settings-section-header"><h4>Bot Messages</h4></div>
+          <div class="settings-section-header"><h4>Bot Profile & Messages</h4></div>
           <div class="settings-section-body">
             <div class="form-group">
               <label for="setting-welcome">Welcome Message</label>
               <textarea id="setting-welcome" class="form-textarea" placeholder="Enter your welcome message here..."></textarea>
               <p class="form-hint">Sent permanently with every /start. Supports Telegram HTML formatting.</p>
+            </div>
+            <div class="form-group" style="margin-top:1rem">
+              <label for="setting-bot-description">What Can This Bot Do? (Description)</label>
+              <textarea id="setting-bot-description" class="form-textarea" rows="3" placeholder="Enter what this bot can do..."></textarea>
+              <p class="form-hint">This text is shown to users on Telegram BEFORE they press the Start button.</p>
+            </div>
+            <div class="form-group" style="margin-top:1rem">
+              <label for="setting-bot-short-description">Bot Short Description</label>
+              <textarea id="setting-bot-short-description" class="form-textarea" rows="2" placeholder="Enter bot short description..."></textarea>
+              <p class="form-hint">A brief description shown in the bot's profile information page.</p>
             </div>
           </div>
         </div>
@@ -612,6 +622,26 @@
           <button type="submit" class="btn btn-primary" id="btn-save-settings">Save Changes</button>
         </div>
       </form>
+
+      <!-- Active Login Sessions Tracker -->
+      <div class="settings-section" style="margin-top:2rem">
+        <div class="settings-section-header"><h4>Active Login Locations (Last 10 Sessions)</h4></div>
+        <div class="settings-section-body" style="padding:0">
+          <table class="table" id="sessions-table">
+            <thead>
+              <tr>
+                <th>Administrator</th>
+                <th>IP Address</th>
+                <th>Browser / Device</th>
+                <th>Login Date & Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="4" class="text-center text-muted">Loading login sessions logs...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <!-- ========================================== -->
