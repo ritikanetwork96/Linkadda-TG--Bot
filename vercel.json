@@ -1,5 +1,12 @@
 {
   "version": 2,
+  "cleanUrls": true,
+  "builds": [
+    {
+      "src": "admin/**",
+      "use": "@vercel/static"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/:path*",
@@ -8,6 +15,14 @@
     {
       "source": "/l/:path*",
       "destination": "https://linkadda-tg-bot.onrender.com/l/:path*"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "/admin/:path*"
+    },
+    {
+      "source": "/((?!api|l|admin).*)",
+      "destination": "/admin/$1"
     }
   ]
 }
