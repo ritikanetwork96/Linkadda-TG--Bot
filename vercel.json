@@ -17,6 +17,10 @@
       "destination": "https://linkadda-tg-bot.onrender.com/l/:path*"
     },
     {
+      "source": "/login",
+      "destination": "/admin/login.html"
+    },
+    {
       "source": "/admin/:path*",
       "destination": "/admin/:path*"
     },
