@@ -2569,7 +2569,11 @@ export async function handleAdminCallback(ctx) {
         ]
       };
 
-      await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: markup }).catch(() => {});
+      try {
+        await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: markup });
+      } catch (err) {
+        await ctx.reply(text, { parse_mode: 'HTML', reply_markup: markup }).catch(() => {});
+      }
       return;
     }
 
