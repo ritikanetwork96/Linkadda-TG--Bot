@@ -24,9 +24,7 @@ async function loadSettings() {
     setVal('setting-welcome',          s.welcomeMessage);
     setVal('setting-bot-description',  s.botDescription);
     setVal('setting-bot-short-description', s.botShortDescription);
-    setVal('setting-limit',            s.startContentLimit);
     setVal('setting-autodelete-hours', s.autoDeleteHours);
-    setCheck('setting-start-enabled',    s.startContentEnabled);
     setCheck('setting-autodelete-enabled', s.autoDeleteEnabled);
     setCheck('setting-bot-enabled',      s.botEnabled);
 
@@ -108,9 +106,7 @@ document.getElementById('settingsForm')?.addEventListener('submit', async (e) =>
       welcomeMessage:      document.getElementById('setting-welcome')?.value.trim(),
       botDescription:      document.getElementById('setting-bot-description')?.value.trim(),
       botShortDescription: document.getElementById('setting-bot-short-description')?.value.trim(),
-      startContentLimit:   parseInt(document.getElementById('setting-limit')?.value, 10),
       autoDeleteHours:     parseInt(document.getElementById('setting-autodelete-hours')?.value, 10),
-      startContentEnabled: document.getElementById('setting-start-enabled')?.checked,
       autoDeleteEnabled:   document.getElementById('setting-autodelete-enabled')?.checked,
       botEnabled:          document.getElementById('setting-bot-enabled')?.checked,
     };

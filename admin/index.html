@@ -168,6 +168,9 @@
         </select>
       </div>
       <div class="admin-profile" id="admin-name">Administrator</div>
+      <button id="topbar-logout-btn" class="btn btn-ghost btn-sm" style="padding:0.35rem; margin-left:0.25rem;" title="Logout">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:16px; height:16px; color:var(--text-danger);"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+      </button>
     </header>
 
     <!-- ========================================== -->
@@ -593,31 +596,15 @@
         <div class="settings-section">
           <div class="settings-section-header"><h4>Content Delivery</h4></div>
           <div class="settings-section-body">
-            <div class="row-split">
-              <div class="form-group">
-                <label for="setting-limit">Start Content Limit</label>
-                <input type="number" id="setting-limit" class="form-input" min="1" max="100">
-                <p class="form-hint">Max items sent per /start (1–100)</p>
-              </div>
-              <div class="form-group">
-                <label for="setting-autodelete-hours">Auto Delete Window</label>
-                <select id="setting-autodelete-hours" class="form-select">
-                  <option value="1">1 Hour</option>
-                  <option value="6">6 Hours</option>
-                  <option value="12">12 Hours</option>
-                  <option value="24">24 Hours</option>
-                  <option value="48">48 Hours</option>
-                </select>
-              </div>
-            </div>
-            <div class="settings-row">
-              <div>
-                <div class="settings-row-label">Enable Start Content Delivery</div>
-                <div class="settings-row-desc">Send queued media after /start command</div>
-              </div>
-              <label class="form-toggle">
-                <input type="checkbox" id="setting-start-enabled">
-              </label>
+            <div class="form-group mb-4" style="max-width:320px">
+              <label for="setting-autodelete-hours">Auto Delete Window</label>
+              <select id="setting-autodelete-hours" class="form-select">
+                <option value="1">1 Hour</option>
+                <option value="6">6 Hours</option>
+                <option value="12">12 Hours</option>
+                <option value="24">24 Hours</option>
+                <option value="48">48 Hours</option>
+              </select>
             </div>
             <div class="settings-row">
               <div>
@@ -679,19 +666,21 @@
       <div class="settings-section" style="margin-top:2rem">
         <div class="settings-section-header"><h4>Active Login Locations (Last 10 Sessions)</h4></div>
         <div class="settings-section-body" style="padding:0">
-          <table class="table" id="sessions-table">
-            <thead>
-              <tr>
-                <th>Administrator</th>
-                <th>IP Address</th>
-                <th>Browser / Device</th>
-                <th>Login Date & Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="4" class="text-center text-muted">Loading login sessions logs...</td></tr>
-            </tbody>
-          </table>
+          <div class="table-container">
+            <table class="data-table" id="sessions-table">
+              <thead>
+                <tr>
+                  <th>Administrator</th>
+                  <th>IP Address</th>
+                  <th>Browser / Device</th>
+                  <th>Login Date & Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="4" class="text-center text-muted">Loading login sessions logs...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
@@ -1684,8 +1673,8 @@
       });
 
       // Bind logout
-      document.getElementById('menu-logout').addEventListener('click', async (e) => {
-        e.preventDefault();
+      const handleLogout = async (e) => {
+        if (e) e.preventDefault();
         const confirmed = await Confirm.show({
           title: 'Sign Out?',
           message: 'Are you sure you want to sign out of the admin panel?',
@@ -1696,7 +1685,10 @@
         if (confirmed) {
           Auth.logout();
         }
-      });
+      };
+
+      document.getElementById('menu-logout').addEventListener('click', handleLogout);
+      document.getElementById('topbar-logout-btn')?.addEventListener('click', handleLogout);
     });
 
     // Listen to hash changes for browser forward/backward navigation
