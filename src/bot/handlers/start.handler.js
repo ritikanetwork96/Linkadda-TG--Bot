@@ -118,6 +118,51 @@ export async function startHandler(ctx) {
         return; // STOP! Bypasses all other content delivery
       }
 
+      // 0b. Link Router (supports l_ format for deep links created from admin bot)
+      if (payload.startsWith('l_')) {
+        const token = payload.substring(2);
+        try {
+          const { Link } = await import('../../models/Link.js');
+          const link = await Link.findOne({ token, $or: [{ botId }, { botId: { $exists: false } }] });
+
+          if (!link) {
+            return ctx.reply('❌ This link is no longer available.').catch(() => {});
+          }
+
+          // Log link opened event
+          await EventLog.log('link_opened', user._id, telegramUser.id, link._id.toString(), {}, botId);
+
+          const { telegramService } = await import('../../services/telegram.service.js');
+          const batchId = new mongoose.Types.ObjectId().toString();
+          
+          let deleteAt = null;
+          if (link.autoDeleteSeconds !== undefined && link.autoDeleteSeconds !== null) {
+            deleteAt = new Date(Date.now() + link.autoDeleteSeconds * 1000);
+          } else if (settings.autoDeleteEnabled) {
+            deleteAt = new Date(Date.now() + settings.autoDeleteHours * 60 * 60 * 1000);
+          }
+
+          // Sort items by sortOrder
+          const items = [...link.items].sort((a, b) => a.sortOrder - b.sortOrder);
+
+          for (const item of items) {
+            if (item.type === 'text') {
+              await ctx.reply(item.text).catch(() => {});
+            } else if (item.mediaId) {
+              const { Content } = await import('../../models/Content.js');
+              const media = await Content.findById(item.mediaId);
+              if (media) {
+                await telegramService.deliverContent(user._id, chatId, media, batchId, deleteAt, botId);
+              }
+            }
+          }
+        } catch (deliveryError) {
+          console.error(`Start Handler: Failed to deliver link "${token}":`, deliveryError.message);
+          return ctx.reply('⚠️ Failed to load content. Please try again later.').catch(() => {});
+        }
+        return;
+      }
+
       // 1. Pack Link Router (supports both pack_ and p_ formats)
       if (payload.startsWith('pack_') || payload.startsWith('p_')) {
         let lookupCode = '';

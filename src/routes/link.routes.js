@@ -23,11 +23,10 @@ router.get('/l/:token', async (req, res, next) => {
     // 1. Find Link
     const link = await Link.findOne({ token });
 
-    // 2. Validate existence, status and expiration
-    const now = new Date();
-    const isExpired = link && link.expiresAt && now > new Date(link.expiresAt);
-    const isValid = link && link.status === 'active' && !isExpired;
-
+    // 2. Validate existence and status
+    const isValid = link && link.status === 'active';
+    const isExpired = false; // Backward compatibility check if needed, but not used now
+    
     if (!isValid) {
       res.status(isExpired ? 410 : 404);
       return res.send(`

@@ -137,6 +137,37 @@ if (config.adminBotToken) {
     ctx.message.text = '⚙️ Settings';
     return handleAdminMessage(ctx);
   });
+  adminBot.hears(/^\/recall_(.+)$/, async (ctx) => {
+    try {
+      const batchId = ctx.match[1];
+      const { Delivery } = await import('../models/Delivery.js');
+      const { telegramService } = await import('../services/telegram.service.js');
+      
+      const deliveries = await Delivery.find({ deliveryBatchId: batchId, status: 'sent' });
+      if (deliveries.length === 0) {
+        return ctx.reply('⚠️ No active messages found for this broadcast ID or they have already been deleted.').catch(() => {});
+      }
+
+      await ctx.reply(`⏳ Recalling broadcast... Deleting messages from ${deliveries.length} users' chats.`).catch(() => {});
+
+      let successCount = 0;
+      for (const del of deliveries) {
+        try {
+          await telegramService.deleteMessage(del.telegramChatId, del.telegramMessageId);
+          del.status = 'deleted';
+          await del.save();
+          successCount++;
+        } catch (err) {
+          console.error(`Recall: Failed to delete message ${del.telegramMessageId} in chat ${del.telegramChatId}:`, err.message);
+        }
+      }
+
+      await ctx.reply(`🗑️ <b>Recall Completed</b>\n\nSuccessfully deleted <b>${successCount}</b> of <b>${deliveries.length}</b> messages from users' chats.`, { parse_mode: 'HTML' }).catch(() => {});
+    } catch (error) {
+      console.error('Recall Command Error:', error);
+      await ctx.reply(`❌ Failed to recall broadcast: ${error.message}`).catch(() => {});
+    }
+  });
 
   adminBot.on('callback_query', handleAdminCallback);
   adminBot.on('message', handleAdminMessage);

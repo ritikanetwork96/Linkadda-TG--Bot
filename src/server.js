@@ -182,7 +182,7 @@ async function handleShutdown(signal) {
   await disconnectDatabase();
 
   console.log('Shutdown: Process exiting.');
-  process.exit(signal === 'uncaughtException' || signal === 'unhandledRejection' ? 1 : 0);
+  process.exit(0);
 }
 
 // Bind process events
@@ -190,13 +190,11 @@ process.on('SIGINT', () => handleShutdown('SIGINT'));
 process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error.message);
-  handleShutdown('uncaughtException');
+  console.error('CRITICAL: Uncaught Exception caught (keeping process alive):', error.stack || error.message || error);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection:', reason.message || reason);
-  handleShutdown('unhandledRejection');
+  console.error('CRITICAL: Unhandled Rejection caught (keeping process alive):', reason?.stack || reason?.message || reason);
 });
 
 bootstrap();

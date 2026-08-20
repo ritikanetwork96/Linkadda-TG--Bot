@@ -13,6 +13,7 @@ import { Content } from '../models/Content.js';
 import { Delivery } from '../models/Delivery.js';
 import { Setting } from '../models/Setting.js';
 import { User } from '../models/User.js';
+import { Link } from '../models/Link.js';
 import { Broadcast } from '../models/Broadcast.js';
 import { ActivityLog } from '../models/ActivityLog.js';
 import { storageService } from '../services/storage.service.js';
@@ -98,6 +99,50 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // ==========================================
 // 1. ADMIN AUTHENTICATION
 // ==========================================
+
+router.get('/auth/token-login', async (req, res, next) => {
+  try {
+    const { token } = req.query;
+    if (!token) {
+      return res.status(400).send('<h1>Error: Missing Token</h1>');
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, config.adminJwtSecret);
+    } catch (err) {
+      return res.status(401).send('<h1>Error: Invalid or Expired Token</h1>');
+    }
+
+    const admin = await Admin.findById(decoded.id);
+    if (!admin) {
+      return res.status(404).send('<h1>Error: Admin User Not Found</h1>');
+    }
+
+    res.cookie('admin_token', token, {
+      httpOnly: true,
+      secure: config.nodeEnv === 'production',
+      sameSite: 'strict',
+      maxAge: 8 * 60 * 60 * 1000, // 8 hours
+    });
+
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Logging In...</title></head>
+      <body>
+        <p>Verifying session, redirecting to Admin Dashboard...</p>
+        <script>
+          localStorage.setItem('admin_token', ${JSON.stringify(token)});
+          window.location.href = '/admin/index.html';
+        </script>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.post('/auth/login', async (req, res, next) => {
   try {
@@ -1117,8 +1162,11 @@ router.post('/content/:id/share-link', authMiddleware, async (req, res, next) =>
       return res.status(404).json({ status: 'error', message: 'Content not found.' });
     }
 
+    const activeBotDoc = await BotModel.findOne({ status: 'active' });
+    const botUsername = activeBotDoc?.username || config.botUsername || 'Bot';
+
     // Format link: https://t.me/BOT_USERNAME?start=f_CONTENT_ID
-    const link = `https://t.me/${config.botUsername}?start=f_${content._id}`;
+    const link = `https://t.me/${botUsername}?start=f_${content._id}`;
     return res.json({ status: 'success', link });
   } catch (error) {
     next(error);
@@ -1162,21 +1210,21 @@ router.patch('/start-content/reorder', authMiddleware, async (req, res, next) =>
   }
 });
 
-router.get('/settings', authMiddleware, async (req, res, next) => {
+router.get('/settings', authMiddleware, activeBotMiddleware, async (req, res, next) => {
   try {
-    const settings = await Setting.getSettings();
+    const settings = await Setting.getSettings(req.botId);
     return res.json({ status: 'success', settings });
   } catch (error) {
     next(error);
   }
 });
 
-router.patch('/settings', authMiddleware, async (req, res, next) => {
+router.patch('/settings', authMiddleware, activeBotMiddleware, async (req, res, next) => {
   try {
     const { welcomeMessage, startContentEnabled, startContentLimit, autoDeleteEnabled, autoDeleteHours, botEnabled, helpMessage, supportLink } = req.body;
     const adminId = req.admin.id;
 
-    const settings = await Setting.getSettings();
+    const settings = await Setting.getSettings(req.botId);
 
     if (welcomeMessage !== undefined) settings.welcomeMessage = welcomeMessage;
     if (startContentEnabled !== undefined) settings.startContentEnabled = startContentEnabled;
@@ -2561,6 +2609,113 @@ router.delete('/system/clear-demo', authMiddleware, activeBotMiddleware, async (
         categories: deletedCategories.deletedCount
       }
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ==========================================
+// 14. GENERATED LINKS MANAGEMENT
+// ==========================================
+
+router.get('/links', authMiddleware, activeBotMiddleware, async (req, res, next) => {
+  try {
+    const botId = req.botId;
+    if (!botId) {
+      return res.status(400).json({ status: 'error', message: 'No active bot selected.' });
+    }
+
+    const cleanSearch = cleanQueryString(req.query.search);
+    const cleanStatus = cleanQueryString(req.query.status);
+    
+    const page = Math.max(1, cleanQueryInt(req.query.page, 1));
+    const limit = Math.max(1, Math.min(cleanQueryInt(req.query.limit, 25), 100));
+
+    const query = { botId, status: { $ne: 'deleted' } };
+    if (cleanStatus) query.status = cleanStatus;
+    if (cleanSearch) {
+      query.token = { $regex: escapeRegex(cleanSearch), $options: 'i' };
+    }
+
+    const total = await Link.countDocuments(query);
+    const links = await Link.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    // Format final urls
+    const activeBot = await BotModel.findById(botId);
+    const botUsername = activeBot ? activeBot.username : 'Bot';
+    const linksWithUrls = links.map(l => {
+      const lObj = l.toObject();
+      lObj.shareLink = `https://t.me/${botUsername}?start=l_${l.token}`;
+      return lObj;
+    });
+
+    return res.json({
+      status: 'success',
+      links: linksWithUrls,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/links/:token/status', authMiddleware, activeBotMiddleware, async (req, res, next) => {
+  try {
+    const botId = req.botId;
+    if (!botId) {
+      return res.status(400).json({ status: 'error', message: 'No active bot selected.' });
+    }
+
+    const { token } = req.params;
+    const { status } = req.body;
+
+    if (!['active', 'inactive'].includes(status)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid status. Must be active or inactive.' });
+    }
+
+    const link = await Link.findOne({ token, botId });
+    if (!link) {
+      return res.status(404).json({ status: 'error', message: 'Link not found.' });
+    }
+
+    link.status = status;
+    await link.save();
+
+    await ActivityLog.log('Link status changed', req.admin.id, 'success', { token, status });
+
+    return res.json({ status: 'success', message: `Link status updated to ${status}.`, link });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/links/:token', authMiddleware, activeBotMiddleware, async (req, res, next) => {
+  try {
+    const botId = req.botId;
+    if (!botId) {
+      return res.status(400).json({ status: 'error', message: 'No active bot selected.' });
+    }
+
+    const { token } = req.params;
+    const link = await Link.findOne({ token, botId });
+    if (!link) {
+      return res.status(404).json({ status: 'error', message: 'Link not found.' });
+    }
+
+    link.status = 'deleted';
+    await link.save();
+
+    await ActivityLog.log('Link deleted', req.admin.id, 'success', { token });
+
+    return res.json({ status: 'success', message: 'Link deleted successfully.' });
   } catch (error) {
     next(error);
   }

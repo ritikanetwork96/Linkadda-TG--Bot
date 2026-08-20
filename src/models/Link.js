@@ -35,7 +35,7 @@ const linkSchema = new mongoose.Schema(
     },
     status: { 
       type: String, 
-      enum: ['active', 'expired', 'deleted'], 
+      enum: ['active', 'inactive', 'expired', 'deleted'], 
       default: 'active', 
       index: true 
     },
@@ -47,6 +47,15 @@ const linkSchema = new mongoose.Schema(
     expiresAt: { 
       type: Date, 
       default: null,
+      index: true
+    },
+    autoDeleteSeconds: {
+      type: Number,
+      default: null
+    },
+    botId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Bot',
       index: true
     },
   },

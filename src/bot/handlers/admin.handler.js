@@ -214,9 +214,10 @@ function parseDuration(val) {
 async function renderMyLinks(ctx, page = 1, edit = false) {
   const limit = 5;
   const skip = (page - 1) * limit;
+  const botId = ctx.state.botId || await resolveBotId();
 
-  const total = await Link.countDocuments({ status: { $ne: 'deleted' } });
-  const links = await Link.find({ status: { $ne: 'deleted' } })
+  const total = await Link.countDocuments({ status: { $ne: 'deleted' }, botId });
+  const links = await Link.find({ status: { $ne: 'deleted' }, botId })
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit);
@@ -243,19 +244,40 @@ async function renderMyLinks(ctx, page = 1, edit = false) {
     const expiresText = link.expiresAt
       ? new Date(link.expiresAt).toUTCString()
       : 'Never';
-    const statusLabel = link.status === 'active'
-      ? (link.expiresAt && new Date() > link.expiresAt ? '⏱️ Expired' : '🟢 Active')
-      : '⏱️ Expired';
+    const statusLabel = link.status === 'active' ? '🟢 Active' : '🔴 Inactive';
+    const createdText = link.createdAt
+      ? new Date(link.createdAt).toLocaleString('en-US', { timeZone: 'Asia/Kolkata', hour12: true }) + ' (IST)'
+      : 'Unknown';
+
+    let autoDeleteText = 'None';
+    if (link.autoDeleteSeconds) {
+      const mins = link.autoDeleteSeconds / 60;
+      if (mins < 60) {
+        autoDeleteText = `${mins}m`;
+      } else {
+        const hrs = mins / 60;
+        if (hrs < 24) {
+          autoDeleteText = `${hrs}h`;
+        } else {
+          autoDeleteText = `${hrs / 24}d`;
+        }
+      }
+    }
 
     text += `• <b>Token:</b> <code>${link.token}</code>\n` +
+            `  <b>Created:</b> <code>${createdText}</code>\n` +
             `  <b>Items:</b> ${link.items.length}\n` +
             `  <b>Status:</b> ${statusLabel}\n` +
-            `  <b>Expires:</b> ${expiresText}\n\n`;
+            `  <b>Link Expiry:</b> ${expiresText}\n` +
+            `  <b>Msg Delete:</b> <code>${autoDeleteText}</code>\n\n`;
+
+    const toggleText = link.status === 'active' ? '🔴 Deactivate' : '🟢 Activate';
 
     // Row of action buttons for each link
     inline_keyboard.push([
-      { text: `👁️ Preview #${link.token}`, callback_data: `admin:link:preview:${link.token}` },
-      { text: `🗑️ Delete #${link.token}`, callback_data: `admin:link:delete:${link.token}:${page}` }
+      { text: `👁️ Preview`, callback_data: `admin:link:preview:${link.token}` },
+      { text: toggleText, callback_data: `admin:link:toggle:${link.token}:${page}` },
+      { text: `🗑️ Delete`, callback_data: `admin:link:delete:${link.token}:${page}` }
     ]);
   }
 
@@ -365,7 +387,7 @@ export async function handleAdminStart(ctx) {
           keyboard: [
             [{ text: '➕ Create Link' }, { text: '📦 My Links' }],
             [{ text: '🖼 Media Library' }, { text: '📊 Statistics' }],
-            [{ text: '⚙️ Settings' }]
+            [{ text: '⚙️ Settings' }, { text: '🌐 Web Admin Panel' }]
           ],
           resize_keyboard: true
         }
@@ -499,7 +521,8 @@ async function renderSequenceComposer(ctx, session, edit = true, sequenceId = nu
     }
   });
 
-  const userBotUsername = config.userBotUsername || ctx.botInfo.username;
+  const activeBotDoc = await Bot.findOne({ status: 'active' });
+  const userBotUsername = activeBotDoc?.username || config.userBotUsername || ctx.botInfo.username;
   const deepLink = `https://t.me/${userBotUsername}?start=${sequence.publicCode}`;
 
   let text = `📦 <b>CONTENT SEQUENCE BUILDER</b>\n\n` +
@@ -740,6 +763,8 @@ export async function handleAdminCallback(ctx) {
 
         await ctx.reply('⏳ Broadcasting post to active users...').catch(() => {});
 
+        const broadcastBatchId = 'dir_' + new mongoose.Types.ObjectId().toString();
+
         (async () => {
           try {
             const activeUsers = await User.find({ botId: ctx.state.botId, status: 'active' });
@@ -748,7 +773,6 @@ export async function handleAdminCallback(ctx) {
             let failed = 0;
 
             for (const userObj of activeUsers) {
-              const batchId = new mongoose.Types.ObjectId().toString();
               try {
                 for (const item of items) {
                   let contentDoc = null;
@@ -769,7 +793,7 @@ export async function handleAdminCallback(ctx) {
                       userObj._id,
                       userObj.telegramUserId,
                       contentDoc,
-                      batchId,
+                      broadcastBatchId,
                       deleteAt,
                       ctx.state.botId
                     );
@@ -792,7 +816,13 @@ export async function handleAdminCallback(ctx) {
           }
         })();
 
-        await ctx.reply('🚀 <b>Broadcast Sent Successfully</b>\n\nAll messages have been queued for active users and will auto-delete at the scheduled time.', { parse_mode: 'HTML' }).catch(() => {});
+        await ctx.reply(
+          `🚀 <b>Broadcast Sent Successfully</b>\n\n` +
+          `All messages have been queued for active users.\n\n` +
+          `To recall/delete this broadcast immediately from all users' chats, send:\n` +
+          `/recall_${broadcastBatchId}`,
+          { parse_mode: 'HTML' }
+        ).catch(() => {});
         return;
       }
 
@@ -843,7 +873,7 @@ export async function handleAdminCallback(ctx) {
         else if (choice === '3d') durationMs = 3 * 24 * 60 * 60 * 1000;
         else if (choice === '7d') durationMs = 7 * 24 * 60 * 60 * 1000;
 
-        const expiresAt = choice === 'never' ? null : new Date(Date.now() + durationMs);
+        const autoDeleteSeconds = choice === 'never' ? null : durationMs / 1000;
 
         let token = crypto.randomBytes(6).toString('hex');
         let existing = await Link.findOne({ token });
@@ -857,20 +887,23 @@ export async function handleAdminCallback(ctx) {
           status: 'active',
           items: session.linkDraft.items,
           createdBy: adminId.toString(),
-          expiresAt
+          expiresAt: null,
+          autoDeleteSeconds,
+          botId: ctx.state.botId
         });
 
         session.linkDraft = { status: 'idle', items: [], expiresAt: null, updatedAt: new Date() };
         session.state = 'IDLE';
         await session.save();
 
-        const domain = config.adminOrigin || `http://localhost:${config.port || 3000}`;
-        const finalUrl = `${domain}/l/${token}`;
+        const activeBotDoc = await Bot.findOne({ status: 'active' });
+        const userBotUsername = activeBotDoc?.username || config.userBotUsername || ctx.botInfo.username;
+        const finalUrl = `https://t.me/${userBotUsername}?start=l_${token}`;
 
         const successText = `✅ <b>Link Created Successfully</b>\n\n` +
                             `• <b>Items:</b> ${newLink.items.length}\n` +
                             `• <b>Status:</b> Active\n` +
-                            `• <b>Expires:</b> ${expiresAt ? expiresAt.toUTCString() : 'Never'}\n\n` +
+                            `• <b>Message Auto-Delete:</b> ${choice === 'never' ? 'Never' : choice}\n\n` +
                             `🔗 <code>${finalUrl}</code>`;
 
         await ctx.reply(successText, { parse_mode: 'HTML' }).catch(() => {});
@@ -889,8 +922,9 @@ export async function handleAdminCallback(ctx) {
         if (!link) {
           return ctx.reply('⚠️ Link not found.').catch(() => {});
         }
-        const domain = config.adminOrigin || `http://localhost:${config.port || 3000}`;
-        const finalUrl = `${domain}/l/${token}`;
+        const activeBotDoc = await Bot.findOne({ status: 'active' });
+        const userBotUsername = activeBotDoc?.username || config.userBotUsername || ctx.botInfo.username;
+        const finalUrl = `https://t.me/${userBotUsername}?start=l_${token}`;
         await ctx.reply(`👁️ <b>Preview Link:</b> ${finalUrl}`).catch(() => {});
         return;
       }
@@ -904,6 +938,21 @@ export async function handleAdminCallback(ctx) {
           link.status = 'deleted';
           await link.save();
           await ctx.reply(`🗑️ Link #${token} deleted successfully.`).catch(() => {});
+        }
+        await renderMyLinks(ctx, page, true);
+        return;
+      }
+
+      if (action === 'toggle') {
+        const token = parts[3];
+        const page = parseInt(parts[4] || '1', 10);
+        
+        const link = await Link.findOne({ token });
+        if (link) {
+          link.status = link.status === 'active' ? 'inactive' : 'active';
+          await link.save();
+          const label = link.status === 'active' ? '🟢 Active' : '🔴 Inactive';
+          await ctx.reply(`🔄 Link #${token} status changed to ${label}.`).catch(() => {});
         }
         await renderMyLinks(ctx, page, true);
         return;
@@ -1203,7 +1252,8 @@ export async function handleAdminCallback(ctx) {
 
         await logAdminActivity('PACK_PUBLISHED', adminId, 'success', { packName: pack.name, code: pack.publicCode });
 
-        const userBotUsername = config.userBotUsername || ctx.botInfo.username;
+        const activeBotDoc = await Bot.findOne({ status: 'active' });
+        const userBotUsername = activeBotDoc?.username || config.userBotUsername || ctx.botInfo.username;
         const deepLink = `https://t.me/${userBotUsername}?start=p_${pack.publicCode}`;
         const expiryText = formatExpiryDescription(pack.expiresAt);
 
@@ -2572,7 +2622,8 @@ export async function handleAdminCallback(ctx) {
       await logAdminActivity('PACK_CREATED', adminId, 'success', { packName: pack.name, code: publicCode });
 
       // Always use the USER BOT username for pack deep links, not the Admin Bot
-      const userBotUsername = config.userBotUsername || ctx.botInfo.username;
+      const activeBotDoc = await Bot.findOne({ status: 'active' });
+      const userBotUsername = activeBotDoc?.username || config.userBotUsername || ctx.botInfo.username;
       const deepLink = `https://t.me/${userBotUsername}?start=pack_${publicCode}`;
       await ctx.reply(`📦 *Pack Created successfully!*\n\n*Name:* ${escapeHTML(pack.name)}\n*Deep Link:*\n\`${deepLink}\``, {
         parse_mode: 'Markdown',
@@ -2595,7 +2646,8 @@ export async function handleAdminCallback(ctx) {
       session.currentPackId = packId;
       await session.save();
 
-      const userBotUsername = config.userBotUsername || ctx.botInfo.username;
+      const activeBotDoc = await Bot.findOne({ status: 'active' });
+      const userBotUsername = activeBotDoc?.username || config.userBotUsername || ctx.botInfo.username;
       const deepLink = `https://t.me/${userBotUsername}?start=p_${pack.publicCode}`;
       const expiryText = formatExpiryDescription(pack.expiresAt);
       
@@ -3578,6 +3630,42 @@ export async function handleAdminMessage(ctx) {
       return showSettingsMenu(ctx);
     }
 
+    if (textMsg === '🌐 Web Admin Panel' || textMsg === '🌐 Web Panel' || textMsg.toLowerCase() === '/panel') {
+      try {
+        const { default: jwt } = await import('jsonwebtoken');
+        const adminUser = await Admin.findOne();
+        if (!adminUser) {
+          return ctx.reply('⚠️ Admin user not found in the database. Please log in via browser first.').catch(() => {});
+        }
+
+        const token = jwt.sign(
+          { id: adminUser._id, email: adminUser.email, name: adminUser.name },
+          config.adminJwtSecret,
+          { expiresIn: '5m' }
+        );
+
+        const domain = config.adminOrigin || `http://localhost:${config.port || 3000}`;
+        const loginUrl = `${domain}/api/admin/auth/token-login?token=${token}`;
+
+        const text = `🌐 <b>Web Admin Panel One-Click Login</b>\n\n` +
+                     `Here is your secure login link to access the Web Admin Panel. You don't need to enter a password. The link will expire in 5 minutes:\n\n` +
+                     `🔗 <code>${domain}/admin/</code>`;
+
+        return ctx.reply(text, {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🔑 One-Click Login to Web Panel', url: loginUrl }],
+              [{ text: '🏠 Home', callback_data: 'admin:home' }]
+            ]
+          }
+        });
+      } catch (err) {
+        console.error('Error generating token login:', err.message);
+        return ctx.reply('⚠️ Failed to generate Web Panel login link.').catch(() => {});
+      }
+    }
+
     // ── Settings: Save Welcome Message ──
     if (session.state === 'SETTINGS_EDIT_WELCOME' && textMsg) {
       try {
@@ -3808,7 +3896,7 @@ export async function handleAdminMessage(ctx) {
         return ctx.reply('⚠️ Invalid format. Send duration like: <code>15m</code>, <code>2h</code>, <code>1d</code>, <code>3d</code>. Or send /cancel:', { parse_mode: 'HTML' }).catch(() => {});
       }
 
-      const expiresAt = new Date(Date.now() + durationMs);
+      const autoDeleteSeconds = durationMs / 1000;
 
       let token = crypto.randomBytes(6).toString('hex');
       let existing = await Link.findOne({ token });
@@ -3822,20 +3910,23 @@ export async function handleAdminMessage(ctx) {
         status: 'active',
         items: session.linkDraft.items,
         createdBy: adminId.toString(),
-        expiresAt
+        expiresAt: null,
+        autoDeleteSeconds,
+        botId: ctx.state.botId
       });
 
       session.linkDraft = { status: 'idle', items: [], expiresAt: null, updatedAt: new Date() };
       session.state = 'IDLE';
       await session.save();
 
-      const domain = config.adminOrigin || `http://localhost:${config.port || 3000}`;
-      const finalUrl = `${domain}/l/${token}`;
+      const activeBotDoc = await Bot.findOne({ status: 'active' });
+      const userBotUsername = activeBotDoc?.username || config.userBotUsername || ctx.botInfo.username;
+      const finalUrl = `https://t.me/${userBotUsername}?start=l_${token}`;
 
       const successText = `✅ <b>Link Created Successfully</b>\n\n` +
                           `• <b>Items:</b> ${newLink.items.length}\n` +
                           `• <b>Status:</b> Active\n` +
-                          `• <b>Expires:</b> ${expiresAt.toUTCString()}\n\n` +
+                          `• <b>Message Auto-Delete:</b> ${textMsg}\n\n` +
                           `🔗 <code>${finalUrl}</code>`;
 
       await ctx.reply(successText, { parse_mode: 'HTML' }).catch(() => {});

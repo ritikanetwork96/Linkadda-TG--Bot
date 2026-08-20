@@ -38,6 +38,7 @@ export async function runExpiryJob() {
       }
     }
 
+    /*
     // Find active links that have expiresAt and are expired
     const expiredLinks = await Link.find({
       status: 'active',
@@ -52,6 +53,7 @@ export async function runExpiryJob() {
         console.log(`ExpiryScheduler: Deactivated expired link ${link._id} (Token: ${link.token})`);
       }
     }
+    */
   } catch (error) {
     console.error('ExpiryScheduler: Error running expiry check job:', error.message);
   }

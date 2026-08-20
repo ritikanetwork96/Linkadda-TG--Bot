@@ -7,28 +7,31 @@
    CARDS / SURFACES
    ===================================================== */
 .card {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  background: rgba(20, 24, 33, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--r-lg);
-  padding: 1.1rem 1.25rem;
+  padding: 1.25rem 1.5rem;
   transition: all var(--t-slow);
   position: relative;
   overflow: hidden;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
 }
 .card::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: var(--r-lg);
-  background: linear-gradient(135deg, rgba(124,58,237,0.06) 0%, transparent 60%);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, transparent 60%);
   opacity: 0;
   transition: opacity var(--t-base);
   pointer-events: none;
 }
 .card:hover {
-  border-color: var(--border-2);
-  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-  transform: translateY(-2px);
+  border-color: rgba(124, 58, 237, 0.4);
+  box-shadow: 0 12px 40px -12px rgba(124, 58, 237, 0.35);
+  transform: translateY(-3px);
 }
 .card:hover::before { opacity: 1; }
 .card-sm { padding: 0.75rem 1rem; }
@@ -369,22 +372,22 @@ input[type="password"], input[type="number"],
 input[type="url"], input[type="datetime-local"],
 textarea, .form-textarea, .form-select, select {
   width: 100%;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid var(--border-2);
-  border-radius: var(--r-sm);
-  padding: 0.55rem 0.85rem;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--r-md);
+  padding: 0.65rem 0.95rem;
   color: var(--text);
   font-size: 0.83rem;
   font-family: inherit;
-  transition: all var(--t-fast);
+  transition: all var(--t-base);
   outline: none;
   -webkit-appearance: none;
   appearance: none;
 }
 .form-input:focus, input:focus, textarea:focus, select:focus, .form-select:focus {
-  border-color: var(--primary);
-  background: rgba(124,58,237,0.06);
-  box-shadow: 0 0 0 2px rgba(124,58,237,0.18);
+  border-color: rgba(124, 58, 237, 0.8);
+  background: rgba(124, 58, 237, 0.04);
+  box-shadow: 0 0 12px rgba(124, 58, 237, 0.25);
 }
 .form-input::placeholder { color: var(--text-dim); }
 textarea, .form-textarea {
