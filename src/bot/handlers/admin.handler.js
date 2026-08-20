@@ -875,15 +875,11 @@ export async function handleAdminCallback(ctx) {
 
         const autoDeleteSeconds = choice === 'never' ? null : durationMs / 1000;
 
-        let token = crypto.randomBytes(6).toString('hex');
-        let existing = await Link.findOne({ token });
-        while (existing) {
-          token = crypto.randomBytes(6).toString('hex');
-          existing = await Link.findOne({ token });
-        }
+        const { token, linkNumber } = await Link.generateNextToken(ctx.state.botId);
 
         const newLink = await Link.create({
           token,
+          linkNumber,
           status: 'active',
           items: session.linkDraft.items,
           createdBy: adminId.toString(),
@@ -3898,15 +3894,11 @@ export async function handleAdminMessage(ctx) {
 
       const autoDeleteSeconds = durationMs / 1000;
 
-      let token = crypto.randomBytes(6).toString('hex');
-      let existing = await Link.findOne({ token });
-      while (existing) {
-        token = crypto.randomBytes(6).toString('hex');
-        existing = await Link.findOne({ token });
-      }
+      const { token, linkNumber } = await Link.generateNextToken(ctx.state.botId);
 
       const newLink = await Link.create({
         token,
+        linkNumber,
         status: 'active',
         items: session.linkDraft.items,
         createdBy: adminId.toString(),

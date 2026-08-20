@@ -197,6 +197,37 @@ if (config.adminBotToken) {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
+// AUTO-RECONNECT — keeps bot running 24/7
+// ─────────────────────────────────────────────────────────────────────────────
+
+let _shutdownRequested = false;
+
+/**
+ * Launches a bot instance and automatically reconnects if it crashes or disconnects.
+ * Uses exponential backoff: 5s → 10s → 20s → ... max 60s
+ * @param {import('telegraf').Telegraf} botInstance
+ * @param {string} name - Label for logging
+ */
+async function launchWithReconnect(botInstance, name) {
+  let delayMs = 5000;
+  while (!_shutdownRequested) {
+    try {
+      console.log(`${name}: Starting polling...`);
+      await botInstance.launch();
+      // launch() resolves only when the bot stops cleanly
+      if (_shutdownRequested) break;
+      console.log(`${name}: Polling ended unexpectedly. Reconnecting in ${delayMs / 1000}s...`);
+    } catch (err) {
+      if (_shutdownRequested) break;
+      console.error(`${name}: Error — ${err.message}. Reconnecting in ${delayMs / 1000}s...`);
+    }
+    await new Promise(r => setTimeout(r, delayMs));
+    delayMs = Math.min(delayMs * 2, 60000); // max 60s backoff
+  }
+  console.log(`${name}: Auto-reconnect loop exited (shutdown requested).`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // BOT MANAGER — single lifecycle controller
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -205,16 +236,12 @@ export const telegramBotManager = {
    * Launch both bots asynchronously. Either bot failing does NOT crash the other.
    */
   async startServices() {
-    // Start User Bot
-    bot.launch()
-      .then(() => console.log('TelegramBotManager: User Bot listener started.'))
-      .catch((err) => console.error('TelegramBotManager: User Bot failed to launch:', err.message));
+    // Start User Bot with auto-reconnect
+    launchWithReconnect(bot, 'TelegramBotManager: User Bot');
 
-    // Start Admin Bot (if configured)
+    // Start Admin Bot (if configured) with auto-reconnect
     if (adminBot) {
-      adminBot.launch()
-        .then(() => console.log('TelegramBotManager: Admin Bot listener started.'))
-        .catch((err) => console.error('TelegramBotManager: Admin Bot failed to launch:', err.message));
+      launchWithReconnect(adminBot, 'TelegramBotManager: Admin Bot');
     }
   },
 
@@ -222,6 +249,7 @@ export const telegramBotManager = {
    * Gracefully stop both bots.
    */
   async stopServices() {
+    _shutdownRequested = true; // Signal auto-reconnect loops to stop
     const stops = [];
     stops.push(
       bot.stop('SIGINT').catch((err) => console.error('TelegramBotManager: Error stopping User Bot:', err.message))

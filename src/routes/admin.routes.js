@@ -2697,6 +2697,54 @@ router.patch('/links/:token/status', authMiddleware, activeBotMiddleware, async 
   }
 });
 
+// PATCH /links/:token — Edit link details (expiresAt, status)
+router.patch('/links/:token', authMiddleware, activeBotMiddleware, async (req, res, next) => {
+  try {
+    const botId = req.botId;
+    if (!botId) {
+      return res.status(400).json({ status: 'error', message: 'No active bot selected.' });
+    }
+
+    const { token } = req.params;
+    const { expiresAt, status } = req.body;
+
+    const link = await Link.findOne({ token, botId });
+    if (!link) {
+      return res.status(404).json({ status: 'error', message: 'Link not found.' });
+    }
+
+    // Update expiresAt — null means never expires
+    if (expiresAt !== undefined) {
+      if (expiresAt === null || expiresAt === '') {
+        link.expiresAt = null;
+      } else {
+        const parsed = new Date(expiresAt);
+        if (isNaN(parsed.getTime())) {
+          return res.status(400).json({ status: 'error', message: 'Invalid date format for expiresAt.' });
+        }
+        link.expiresAt = parsed;
+      }
+    }
+
+    // Update status if provided
+    if (status !== undefined) {
+      if (!['active', 'inactive'].includes(status)) {
+        return res.status(400).json({ status: 'error', message: 'Invalid status.' });
+      }
+      link.status = status;
+    }
+
+    await link.save();
+    await ActivityLog.log('Link edited', req.admin.id, 'success', { token });
+
+    return res.json({ status: 'success', message: 'Link updated successfully.', link });
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+
 router.delete('/links/:token', authMiddleware, activeBotMiddleware, async (req, res, next) => {
   try {
     const botId = req.botId;
