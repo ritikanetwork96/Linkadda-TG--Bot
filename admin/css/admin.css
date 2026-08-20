@@ -96,13 +96,13 @@ body {
   z-index: -1;
   pointer-events: none;
   overflow: hidden;
-  background-color: #050507; /* Darker rich background */
+  background-color: #07090E;
 }
 .bg-ambient::before {
   content: '';
   position: absolute;
   width: 800px; height: 800px;
-  background: radial-gradient(circle, rgba(124,58,237,0.12) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(124,58,237,0.04) 0%, transparent 70%);
   top: -250px; right: -200px;
   animation: pulse-glow 15s ease-in-out infinite alternate;
 }
@@ -110,7 +110,7 @@ body {
   content: '';
   position: absolute;
   width: 600px; height: 600px;
-  background: radial-gradient(circle, rgba(34,211,238,0.08) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(34,211,238,0.02) 0%, transparent 65%);
   bottom: -150px; left: -150px;
   animation: pulse-glow 20s ease-in-out infinite alternate-reverse;
 }

@@ -7,33 +7,20 @@
    CARDS / SURFACES
    ===================================================== */
 .card {
-  background: rgba(20, 24, 33, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0F1219;
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--r-lg);
   padding: 1.25rem 1.5rem;
-  transition: all var(--t-slow);
+  transition: all var(--t-base);
   position: relative;
   overflow: hidden;
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
-}
-.card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: var(--r-lg);
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, transparent 60%);
-  opacity: 0;
-  transition: opacity var(--t-base);
-  pointer-events: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 .card:hover {
-  border-color: rgba(124, 58, 237, 0.4);
-  box-shadow: 0 12px 40px -12px rgba(124, 58, 237, 0.35);
-  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
 }
-.card:hover::before { opacity: 1; }
 .card-sm { padding: 0.75rem 1rem; }
 .card-title {
   font-size: 0.78rem;
