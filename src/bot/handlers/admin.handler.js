@@ -3698,153 +3698,181 @@ export async function handleAdminMessage(ctx) {
       return;
     }
 
-    if (session.state === 'LINK_DRAFT_ADD' || (session.state === 'IDLE' && (ctx.message?.photo || ctx.message?.video || ctx.message?.document || (ctx.message?.text && !textMsg.startsWith('/'))))) {
-      let type = '';
-      let fileId = '';
-      let fileUniqueId = '';
-      let caption = ctx.message.caption || '';
-      let text = ctx.message.text || '';
-      let mimeType = 'application/octet-stream';
-      let fileSize = 0;
-      let filename = 'file';
-
-      if (ctx.message.photo) {
-        type = 'photo';
-        const p = ctx.message.photo[ctx.message.photo.length - 1];
-        fileId = p.file_id;
-        fileUniqueId = p.file_unique_id;
-        mimeType = 'image/jpeg';
-        filename = `photo_${fileUniqueId}.jpg`;
-      } else if (ctx.message.video) {
-        type = 'video';
-        fileId = ctx.message.video.file_id;
-        fileUniqueId = ctx.message.video.file_unique_id;
-        mimeType = ctx.message.video.mime_type || 'video/mp4';
-        filename = ctx.message.video.file_name || `video_${fileUniqueId}.mp4`;
-        fileSize = ctx.message.video.file_size || 0;
-      } else if (ctx.message.document) {
-        type = 'document';
-        fileId = ctx.message.document.file_id;
-        fileUniqueId = ctx.message.document.file_unique_id;
-        mimeType = ctx.message.document.mime_type || 'application/octet-stream';
-        filename = ctx.message.document.file_name || `doc_${fileUniqueId}`;
-        fileSize = ctx.message.document.file_size || 0;
-      } else if (ctx.message.text) {
-        type = 'text';
-      } else {
-        return ctx.reply('⚠️ Unsupported media type. Please send a Photo, Video, Document, or Text.').catch(() => {});
+    if (session.state === 'LINK_DRAFT_ADD' || session.state === 'LINK_DRAFT_WAIT_NEXT' || (session.state === 'IDLE' && (ctx.message?.photo || ctx.message?.video || ctx.message?.document || (ctx.message?.text && !textMsg.startsWith('/'))))) {
+      const mediaGroupId = ctx.message?.media_group_id;
+      if (mediaGroupId) {
+        global.linkDraftLocks = global.linkDraftLocks || {};
+        while (global.linkDraftLocks[mediaGroupId]) {
+          await new Promise(r => setTimeout(r, 50));
+        }
+        global.linkDraftLocks[mediaGroupId] = true;
       }
 
-      // Initialize draft if it doesn't exist
-      if (!session.linkDraft || session.linkDraft.status !== 'draft') {
-        session.linkDraft = {
-          status: 'draft',
-          items: [],
-          expiresAt: null,
-          updatedAt: new Date()
-        };
-      }
+      try {
+        let type = '';
+        let fileId = '';
+        let fileUniqueId = '';
+        let caption = ctx.message.caption || '';
+        let text = ctx.message.text || '';
+        let mimeType = 'application/octet-stream';
+        let fileSize = 0;
+        let filename = 'file';
 
-      let contentId = null;
+        if (ctx.message.photo) {
+          type = 'photo';
+          const p = ctx.message.photo[ctx.message.photo.length - 1];
+          fileId = p.file_id;
+          fileUniqueId = p.file_unique_id;
+          mimeType = 'image/jpeg';
+          filename = `photo_${fileUniqueId}.jpg`;
+        } else if (ctx.message.video) {
+          type = 'video';
+          fileId = ctx.message.video.file_id;
+          fileUniqueId = ctx.message.video.file_unique_id;
+          mimeType = ctx.message.video.mime_type || 'video/mp4';
+          filename = ctx.message.video.file_name || `video_${fileUniqueId}.mp4`;
+          fileSize = ctx.message.video.file_size || 0;
+        } else if (ctx.message.document) {
+          type = 'document';
+          fileId = ctx.message.document.file_id;
+          fileUniqueId = ctx.message.document.file_unique_id;
+          mimeType = ctx.message.document.mime_type || 'application/octet-stream';
+          filename = ctx.message.document.file_name || `doc_${fileUniqueId}`;
+          fileSize = ctx.message.document.file_size || 0;
+        } else if (ctx.message.text) {
+          type = 'text';
+        } else {
+          return ctx.reply('⚠️ Unsupported media type. Please send a Photo, Video, Document, or Text.').catch(() => {});
+        }
 
-      if (type !== 'text') {
-        let contentDoc = await Content.findOne({ telegramFileUniqueId: fileUniqueId });
-        if (!contentDoc) {
-          const fileInfo = await ctx.telegram.getFile(fileId).catch(() => null);
-          const maxFileSizeLimit = (config.maxFileSizeMb || 20) * 1024 * 1024;
-          if (fileInfo && fileInfo.file_size && fileInfo.file_size > maxFileSizeLimit) {
-            return ctx.reply(`⚠️ File is too large. Configured limit is ${config.maxFileSizeMb || 20}MB.`).catch(() => {});
-          }
-          
-          const progressMsg = await ctx.reply('⏳ Uploading media to S3...').catch(() => null);
+        // Fetch fresh session to ensure latest list of items (prevents overwrite due to async updates)
+        const freshSession = await AdminSession.getSession(adminId);
+        if (!freshSession.linkDraft || freshSession.linkDraft.status !== 'draft') {
+          freshSession.linkDraft = {
+            status: 'draft',
+            items: [],
+            expiresAt: null,
+            updatedAt: new Date()
+          };
+        }
 
-          try {
-            const fileLink = await ctx.telegram.getFileLink(fileId);
-            const response = await fetch(fileLink.href);
-            const arrayBuffer = await response.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
+        let contentId = null;
 
-            const safeRandom = crypto.randomBytes(8).toString('hex');
-            const storageKey = `collections/${fileUniqueId || safeRandom}_${filename}`;
+        if (type !== 'text') {
+          let contentDoc = await Content.findOne({ telegramFileUniqueId: fileUniqueId });
+          if (!contentDoc) {
+            const fileInfo = await ctx.telegram.getFile(fileId).catch(() => null);
+            const maxFileSizeLimit = (config.maxFileSizeMb || 20) * 1024 * 1024;
+            if (fileInfo && fileInfo.file_size && fileInfo.file_size > maxFileSizeLimit) {
+              return ctx.reply(`⚠️ File is too large. Configured limit is ${config.maxFileSizeMb || 20}MB.`).catch(() => {});
+            }
+            
+            const progressMsg = await ctx.reply(`⏳ Uploading ${filename} to S3...`).catch(() => null);
 
-            await storageService.uploadObject(storageKey, buffer, mimeType);
+            try {
+              const fileLink = await ctx.telegram.getFileLink(fileId);
+              const response = await fetch(fileLink.href);
+              const arrayBuffer = await response.arrayBuffer();
+              const buffer = Buffer.from(arrayBuffer);
 
-            contentDoc = await Content.create({
-              title: filename,
-              type,
-              storageKey,
-              storageBucket: config.filebase.bucket,
-              mimeType,
-              fileSize,
-              originalFileName: filename,
-              telegramFileUniqueId: fileUniqueId,
-              caption,
-              status: 'active',
-              botId: ctx.state.botId
-            });
-          } catch (err) {
-            console.error('S3 Collection Upload Failed:', err.message);
+              const safeRandom = crypto.randomBytes(8).toString('hex');
+              const storageKey = `collections/${fileUniqueId || safeRandom}_${filename}`;
+
+              await storageService.uploadObject(storageKey, buffer, mimeType);
+
+              contentDoc = await Content.create({
+                title: filename,
+                type,
+                storageKey,
+                storageBucket: config.filebase.bucket,
+                mimeType,
+                fileSize,
+                originalFileName: filename,
+                telegramFileUniqueId: fileUniqueId,
+                caption,
+                status: 'active',
+                botId: ctx.state.botId
+              });
+            } catch (err) {
+              console.error('S3 Collection Upload Failed:', err.message);
+              if (progressMsg) {
+                await ctx.telegram.deleteMessage(ctx.chat.id, progressMsg.message_id).catch(() => {});
+              }
+              return ctx.reply(`❌ Failed to upload media to S3: ${err.message}`).catch(() => {});
+            }
+
             if (progressMsg) {
               await ctx.telegram.deleteMessage(ctx.chat.id, progressMsg.message_id).catch(() => {});
             }
-            return ctx.reply(`❌ Failed to upload media to S3: ${err.message}`).catch(() => {});
           }
 
-          if (progressMsg) {
-            await ctx.telegram.deleteMessage(ctx.chat.id, progressMsg.message_id).catch(() => {});
-          }
+          contentId = contentDoc._id;
         }
 
-        contentId = contentDoc._id;
+        const newItem = {
+          type,
+          mediaId: contentId,
+          text: type === 'text' ? text : '',
+          caption: type !== 'text' ? caption : '',
+          sortOrder: freshSession.linkDraft.items.length
+        };
+
+        freshSession.linkDraft.items.push(newItem);
+        freshSession.linkDraft.updatedAt = new Date();
+        freshSession.state = 'LINK_DRAFT_ADD';
+        freshSession.markModified('linkDraft');
+        await freshSession.save();
+
+        if (mediaGroupId) {
+          global.linkDraftTimers = global.linkDraftTimers || {};
+          if (global.linkDraftTimers[mediaGroupId]) {
+            clearTimeout(global.linkDraftTimers[mediaGroupId]);
+          }
+          global.linkDraftTimers[mediaGroupId] = setTimeout(async () => {
+            delete global.linkDraftTimers[mediaGroupId];
+            const finalSession = await AdminSession.getSession(adminId);
+            await ctx.reply(
+              `✅ Media Group added successfully!\n\n` +
+              `Total items in this link draft: <b>${finalSession.linkDraft.items.length}</b>`,
+              {
+                parse_mode: 'HTML',
+                reply_markup: {
+                  inline_keyboard: [
+                    [{ text: '➕ Add More', callback_data: 'admin:link:add_more' }],
+                    [{ text: '🚀 Direct Send', callback_data: 'admin:link:direct_init' }],
+                    [{ text: '🔗 Create Link', callback_data: 'admin:link:finalize' }],
+                    [{ text: '❌ Cancel', callback_data: 'admin:link:cancel' }]
+                  ]
+                }
+              }
+            ).catch(() => {});
+          }, 1200);
+        } else {
+          const typeLabels = { photo: 'Photo', video: 'Video', document: 'Document', text: 'Text message' };
+          await ctx.reply(
+            `✅ ${typeLabels[type] || 'Item'} added successfully!\n\n` +
+            `Total items in this link draft: <b>${freshSession.linkDraft.items.length}</b>`,
+            {
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '➕ Add More', callback_data: 'admin:link:add_more' }],
+                  [{ text: '🚀 Direct Send', callback_data: 'admin:link:direct_init' }],
+                  [{ text: '🔗 Create Link', callback_data: 'admin:link:finalize' }],
+                  [{ text: '❌ Cancel', callback_data: 'admin:link:cancel' }]
+                ]
+              }
+            }
+          ).catch(() => {});
+        }
+      } finally {
+        if (mediaGroupId && global.linkDraftLocks) {
+          delete global.linkDraftLocks[mediaGroupId];
+        }
       }
-
-      const newItem = {
-        type,
-        mediaId: contentId,
-        text: type === 'text' ? text : '',
-        caption: type !== 'text' ? caption : '',
-        sortOrder: session.linkDraft.items.length
-      };
-
-      session.linkDraft.items.push(newItem);
-      session.linkDraft.updatedAt = new Date();
-      session.state = 'LINK_DRAFT_WAIT_NEXT';
-      session.markModified('linkDraft');
-      await session.save();
-
-      const typeLabels = { photo: 'Photo', video: 'Video', document: 'Document', text: 'Text message' };
-      return ctx.reply(
-        `✅ ${typeLabels[type]} added\n\n` +
-        `Items in this draft: ${session.linkDraft.items.length}`,
-        {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: '➕ Add More', callback_data: 'admin:link:add_more' }],
-              [{ text: '🚀 Direct Send', callback_data: 'admin:link:direct_init' }],
-              [{ text: '🔗 Create Link', callback_data: 'admin:link:finalize' }],
-              [{ text: '❌ Cancel', callback_data: 'admin:link:cancel' }]
-            ]
-          }
-        }
-      );
+      return;
     }
 
-    if (session.state === 'LINK_DRAFT_WAIT_NEXT') {
-      return ctx.reply(
-        `⚠️ Please select an action to proceed.\n\n` +
-        `Items in this draft: ${session.linkDraft.items.length}`,
-        {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: '➕ Add More', callback_data: 'admin:link:add_more' }],
-              [{ text: '🚀 Direct Send', callback_data: 'admin:link:direct_init' }],
-              [{ text: '🔗 Create Link', callback_data: 'admin:link:finalize' }],
-              [{ text: '❌ Cancel', callback_data: 'admin:link:cancel' }]
-            ]
-          }
-        }
-      );
-    }
 
     if (session.state === 'WAITING_FOR_CUSTOM_EXPIRY_DIRECT') {
       if (textMsg === '/cancel') {
