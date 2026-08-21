@@ -41,14 +41,16 @@ export async function populateGlobalBotSwitcher() {
       return;
     }
 
-    switcher.innerHTML = bots.map(b => `
+    switcher.innerHTML = `
+      <option value="all">🌍 All Bots (Global View)</option>
+    ` + bots.map(b => `
       <option value="${b._id}" ${b.status === 'connected' ? 'selected' : ''}>
         ${escapeHTML(b.displayName)} ${b.username ? `(@${escapeHTML(b.username)})` : ''}
       </option>
     `).join('');
 
     const savedBotId = localStorage.getItem('admin_active_bot_id');
-    if (savedBotId && bots.some(b => b._id === savedBotId)) {
+    if (savedBotId && (savedBotId === 'all' || bots.some(b => b._id === savedBotId))) {
       switcher.value = savedBotId;
     } else {
       const activeConnected = bots.find(b => b.status === 'connected');

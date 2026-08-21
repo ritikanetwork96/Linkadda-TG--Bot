@@ -33,7 +33,7 @@ export const API = {
 
     // Attach active bot ID (for multi-bot context)
     const activeBotId = localStorage.getItem('admin_active_bot_id');
-    if (activeBotId) headers.set('X-Bot-ID', activeBotId);
+    if (activeBotId && activeBotId !== 'all') headers.set('X-Bot-ID', activeBotId);
 
     // Set Content-Type for non-FormData bodies
     if (options.body && !(options.body instanceof FormData)) {
@@ -86,7 +86,7 @@ export const API = {
     const activeBotId = localStorage.getItem('admin_active_bot_id');
     const reqHeaders = new Headers(headers);
     if (token) reqHeaders.set('Authorization', `Bearer ${token}`);
-    if (activeBotId) reqHeaders.set('X-Bot-ID', activeBotId);
+    if (activeBotId && activeBotId !== 'all') reqHeaders.set('X-Bot-ID', activeBotId);
 
     const response = await fetch(url, { headers: reqHeaders, credentials: 'include' });
     if (!response.ok) {
