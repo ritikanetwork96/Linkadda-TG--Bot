@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import { config } from './env.js';
 
+let isListenersRegistered = false;
+
 export async function connectDatabase() {
   try {
     const options = {
@@ -8,17 +10,26 @@ export async function connectDatabase() {
       autoIndex: true, // Build indexes
     };
 
-    mongoose.connection.on('connected', () => {
-      console.log('MongoDB: Database connection established successfully.');
-    });
+    if (!isListenersRegistered) {
+      mongoose.connection.on('connected', () => {
+        console.log('MongoDB: Database connection established successfully.');
+      });
 
-    mongoose.connection.on('error', (err) => {
-      console.error(`MongoDB: Connection error: ${err.message}`);
-    });
+      mongoose.connection.on('error', (err) => {
+        console.error(`MongoDB: Connection error: ${err.message}`);
+      });
 
-    mongoose.connection.on('disconnected', () => {
-      console.warn('MongoDB: Connection disconnected.');
-    });
+      mongoose.connection.on('disconnected', () => {
+        console.warn('MongoDB: Connection disconnected.');
+      });
+
+      isListenersRegistered = true;
+    }
+
+    if (mongoose.connection.readyState === 1) {
+      console.log('MongoDB: Database is already connected. Skipping reconnection.');
+      return mongoose.connection;
+    }
 
     await mongoose.connect(config.mongodbUri, options);
     return mongoose.connection;

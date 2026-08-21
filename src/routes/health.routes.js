@@ -28,10 +28,10 @@ router.get('/health', async (req, res, next) => {
     }
 
     // Backward-compat: also report single 'telegram' field for older admin panel code
-    const telegramStatus = userBot.status === 'ok' ? 'connected' : 'disconnected';
+    const telegramStatus = userBot.state === 'running' ? 'connected' : 'disconnected';
     const storageStatus = 'configured';
 
-    const overallOk = dbStatus === 'connected' && telegramStatus === 'connected';
+    const overallOk = dbStatus === 'connected';
 
     return res.status(overallOk ? 200 : 500).json({
       status: overallOk ? 'ok' : 'error',

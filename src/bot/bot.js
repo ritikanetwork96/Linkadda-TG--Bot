@@ -197,34 +197,161 @@ if (config.adminBotToken) {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AUTO-RECONNECT — keeps bot running 24/7
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTO-RECONNECT & LIFECYCLE MANAGER — keeps bots running 24/7 independently
 // ─────────────────────────────────────────────────────────────────────────────
 
-let _shutdownRequested = false;
+class BotLifecycleManager {
+  constructor(botInstance, name, type) {
+    this.bot = botInstance;
+    this.name = name;
+    this.type = type;
+    this.state = 'stopped'; // 'stopped', 'starting', 'running', 'reconnecting', 'failed'
+    this.reconnectAttempts = 0;
+    this.lastSuccessfulCheck = null;
+    this.lastUpdateReceived = null;
+    this.lastError = null;
+    this.tokenValid = null;
 
-/**
- * Launches a bot instance and automatically reconnects if it crashes or disconnects.
- * Uses exponential backoff: 5s → 10s → 20s → ... max 60s
- * @param {import('telegraf').Telegraf} botInstance
- * @param {string} name - Label for logging
- */
-async function launchWithReconnect(botInstance, name) {
-  let delayMs = 5000;
-  while (!_shutdownRequested) {
-    try {
-      console.log(`${name}: Starting polling...`);
-      await botInstance.launch();
-      // launch() resolves only when the bot stops cleanly
-      if (_shutdownRequested) break;
-      console.log(`${name}: Polling ended unexpectedly. Reconnecting in ${delayMs / 1000}s...`);
-    } catch (err) {
-      if (_shutdownRequested) break;
-      console.error(`${name}: Error — ${err.message}. Reconnecting in ${delayMs / 1000}s...`);
-    }
-    await new Promise(r => setTimeout(r, delayMs));
-    delayMs = Math.min(delayMs * 2, 60000); // max 60s backoff
+    this.shutdownRequested = false;
+    this.reconnectTimer = null;
+    this.pollingActive = false;
+    this.runningPromise = null;
   }
-  console.log(`${name}: Auto-reconnect loop exited (shutdown requested).`);
+
+  async start() {
+    if (this.state === 'running' || this.state === 'starting') {
+      console.log(`[BotLifecycleManager] ${this.name} is already starting or running. Skipping.`);
+      return;
+    }
+
+    this.shutdownRequested = false;
+    this.state = 'starting';
+    this.runningPromise = this.runLoop();
+  }
+
+  async stop() {
+    this.shutdownRequested = true;
+    this.state = 'stopped';
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    try {
+      if (this.pollingActive) {
+        await this.bot.stop();
+        this.pollingActive = false;
+      }
+    } catch (err) {
+      console.error(`[BotLifecycleManager] Error stopping ${this.name}:`, err.message);
+    }
+    // Wait for runLoop to complete
+    if (this.runningPromise) {
+      await this.runningPromise.catch(() => {});
+      this.runningPromise = null;
+    }
+    console.log(`[BotLifecycleManager] ${this.name} stopped.`);
+  }
+
+  async runLoop() {
+    let delayMs = 5000;
+
+    while (!this.shutdownRequested) {
+      try {
+        console.log(`[BotLifecycleManager] ${this.name} verifying token...`);
+        
+        // Verify token first
+        const me = await this.bot.telegram.getMe();
+        console.log(`[BotLifecycleManager] ${this.name} verified as @${me.username}`);
+        this.lastSuccessfulCheck = new Date();
+        this.tokenValid = true;
+        
+        if (this.shutdownRequested) break;
+
+        // Delete any existing webhooks before polling starts
+        console.log(`[BotLifecycleManager] ${this.name} deleting existing webhook...`);
+        await this.bot.telegram.deleteWebhook({ drop_pending_updates: true }).catch(e => {
+          console.warn(`[BotLifecycleManager] ${this.name} warning deleting webhook:`, e.message);
+        });
+
+        if (this.shutdownRequested) break;
+
+        this.state = 'running';
+        this.reconnectAttempts = 0;
+        this.pollingActive = true;
+
+        console.log(`[BotLifecycleManager] ${this.name} launching polling...`);
+        await this.bot.launch();
+        
+        // If it resolved cleanly and shutdown wasn't requested:
+        if (this.shutdownRequested) {
+          this.pollingActive = false;
+          break;
+        }
+        
+        console.log(`[BotLifecycleManager] ${this.name} polling stopped unexpectedly.`);
+        this.state = 'reconnecting';
+        this.pollingActive = false;
+
+      } catch (err) {
+        this.pollingActive = false;
+        if (this.shutdownRequested) break;
+
+        this.lastError = err.message || 'Unknown polling error';
+        console.error(`[BotLifecycleManager] ${this.name} error:`, err.message);
+
+        // Check if authentication failed (401)
+        if (err.message && (err.message.includes('401') || err.message.includes('Unauthorized') || err.message.includes('blocked'))) {
+          this.state = 'failed';
+          this.tokenValid = false;
+          console.error(`[BotLifecycleManager] ${this.name} failed permanently (Authentication failed).`);
+          break; // Stop reconnect loop for invalid token
+        }
+
+        this.state = 'reconnecting';
+        this.reconnectAttempts++;
+
+        // Determine backoff delay
+        let actualDelay = delayMs;
+        
+        // Handle Telegram 429 rate limit
+        if (err.parameters && err.parameters.retry_after) {
+          const retryAfter = parseInt(err.parameters.retry_after, 10);
+          if (!isNaN(retryAfter)) {
+            actualDelay = (retryAfter * 1000) + 1000;
+            console.warn(`[BotLifecycleManager] ${this.name} rate limited (429). Retrying in ${actualDelay / 1000}s as requested by Telegram.`);
+          }
+        } else {
+          // Standard exponential backoff: 5s, 10s, 20s, 40s, max 60s
+          actualDelay = Math.min(5000 * Math.pow(2, this.reconnectAttempts - 1), 60000);
+        }
+
+        console.log(`[BotLifecycleManager] ${this.name} waiting ${actualDelay / 1000}s before reconnect attempt #${this.reconnectAttempts}...`);
+        
+        await new Promise(resolve => {
+          this.reconnectTimer = setTimeout(resolve, actualDelay);
+        });
+      }
+    }
+  }
+
+  registerUpdateMiddleware() {
+    this.bot.use(async (ctx, next) => {
+      this.lastUpdateReceived = new Date();
+      this.lastSuccessfulCheck = new Date();
+      await next();
+    });
+  }
+}
+
+// Instantiate lifecycle managers for both bots
+export const userBotManager = new BotLifecycleManager(bot, 'User Bot', 'userBot');
+userBotManager.registerUpdateMiddleware();
+
+export let adminBotManager = null;
+if (adminBot) {
+  adminBotManager = new BotLifecycleManager(adminBot, 'Admin Bot', 'adminBot');
+  adminBotManager.registerUpdateMiddleware();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -236,12 +363,16 @@ export const telegramBotManager = {
    * Launch both bots asynchronously. Either bot failing does NOT crash the other.
    */
   async startServices() {
-    // Start User Bot with auto-reconnect
-    launchWithReconnect(bot, 'TelegramBotManager: User Bot');
+    // Start User Bot with manager
+    userBotManager.start().catch(err => {
+      console.error('TelegramBotManager: Failed to start User Bot service:', err.message);
+    });
 
-    // Start Admin Bot (if configured) with auto-reconnect
-    if (adminBot) {
-      launchWithReconnect(adminBot, 'TelegramBotManager: Admin Bot');
+    // Start Admin Bot (if configured)
+    if (adminBotManager) {
+      adminBotManager.start().catch(err => {
+        console.error('TelegramBotManager: Failed to start Admin Bot service:', err.message);
+      });
     }
   },
 
@@ -249,17 +380,11 @@ export const telegramBotManager = {
    * Gracefully stop both bots.
    */
   async stopServices() {
-    _shutdownRequested = true; // Signal auto-reconnect loops to stop
-    const stops = [];
-    stops.push(
-      bot.stop('SIGINT').catch((err) => console.error('TelegramBotManager: Error stopping User Bot:', err.message))
-    );
-    if (adminBot) {
-      stops.push(
-        adminBot.stop('SIGINT').catch((err) => console.error('TelegramBotManager: Error stopping Admin Bot:', err.message))
-      );
-    }
-    await Promise.allSettled(stops);
+    console.log('TelegramBotManager: Stopping both bot services...');
+    await Promise.allSettled([
+      userBotManager.stop(),
+      adminBotManager ? adminBotManager.stop() : Promise.resolve()
+    ]);
     console.log('TelegramBotManager: All bot listeners stopped.');
   },
 
@@ -267,28 +392,32 @@ export const telegramBotManager = {
    * Health status of both bots (non-throwing).
    */
   async healthCheck() {
-    const result = {
-      userBot: { status: 'unknown' },
-      adminBot: { status: config.adminBotToken ? 'unknown' : 'disabled' },
+    const userBotStatus = {
+      state: userBotManager.state,
+      lastSuccessfulCheck: userBotManager.lastSuccessfulCheck,
+      lastUpdate: userBotManager.lastUpdateReceived,
+      reconnectAttempts: userBotManager.reconnectAttempts,
+      lastError: userBotManager.lastError
     };
 
-    try {
-      const info = await bot.telegram.getMe();
-      result.userBot = { status: 'ok', username: info.username, id: info.id };
-    } catch (err) {
-      result.userBot = { status: 'error', error: err.message };
-    }
+    const adminBotStatus = adminBotManager ? {
+      state: adminBotManager.state,
+      lastSuccessfulCheck: adminBotManager.lastSuccessfulCheck,
+      lastUpdate: adminBotManager.lastUpdateReceived,
+      reconnectAttempts: adminBotManager.reconnectAttempts,
+      lastError: adminBotManager.lastError
+    } : {
+      state: 'stopped',
+      lastSuccessfulCheck: null,
+      lastUpdate: null,
+      reconnectAttempts: 0,
+      lastError: null
+    };
 
-    if (adminBot) {
-      try {
-        const info = await adminBot.telegram.getMe();
-        result.adminBot = { status: 'ok', username: info.username, id: info.id };
-      } catch (err) {
-        result.adminBot = { status: 'error', error: err.message };
-      }
-    }
-
-    return result;
+    return {
+      userBot: userBotStatus,
+      adminBot: adminBotStatus
+    };
   },
 };
 
@@ -302,20 +431,17 @@ export const telegramBotManager = {
  * @returns {Promise<object>} Bot identity metadata
  */
 export async function reinitializeBot(newToken) {
-  try {
-    await bot.stop();
-    console.log('TelegramBotManager: Stopped User Bot listener for reinitialization.');
-  } catch (_) { /* ignore if not running */ }
+  console.log('TelegramBotManager: Stopping User Bot for reinitialization...');
+  await userBotManager.stop();
 
   const { telegramService } = await import('../services/telegram.service.js');
   bot.telegram.token = newToken;
   telegramService.client.token = newToken;
 
+  console.log('TelegramBotManager: Relaunching User Bot manager with new token...');
+  await userBotManager.start();
+
+  // Try to get new identity
   const botInfo = await bot.telegram.getMe();
-
-  bot.launch()
-    .then(() => console.log(`TelegramBotManager: User Bot restarted as @${botInfo.username}`))
-    .catch((err) => console.error('TelegramBotManager: Failed to relaunch User Bot:', err.message));
-
   return botInfo;
 }

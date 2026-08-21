@@ -223,6 +223,7 @@ async function handleShutdown(signal) {
 // Bind process events
 process.on('SIGINT', () => handleShutdown('SIGINT'));
 process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+process.once('SIGUSR2', () => handleShutdown('SIGUSR2'));
 
 process.on('uncaughtException', (error) => {
   console.error('CRITICAL: Uncaught Exception caught (keeping process alive):', error.stack || error.message || error);

@@ -22,8 +22,49 @@ async function loadSystemStats() {
       document.getElementById('system-db-status').style.color = 'var(--text-danger)';
     }
 
+    // Render bot statuses
+    updateBotStatusRow('row-user-bot', res.userBot);
+    updateBotStatusRow('row-admin-bot', res.adminBot);
+
   } catch (err) {
     console.error('System Stats Load Error:', err.message);
+  }
+}
+
+function updateBotStatusRow(rowId, botData) {
+  const row = document.getElementById(rowId);
+  if (!row || !botData) return;
+
+  const statusEl = row.querySelector('td:nth-child(2)');
+  const checkEl = row.querySelector('.last-check');
+  const updateEl = row.querySelector('.last-update');
+  const attemptsEl = row.querySelector('.attempts');
+  const errorEl = row.querySelector('.last-error');
+
+  let statusBadge = '';
+  if (botData.state === 'running') {
+    statusBadge = '<span class="badge badge-success">🟢 Running</span>';
+  } else if (botData.state === 'reconnecting' || botData.state === 'starting') {
+    statusBadge = '<span class="badge badge-warning">🟡 Reconnecting</span>';
+  } else if (botData.state === 'failed') {
+    statusBadge = '<span class="badge badge-danger">🔴 Failed</span>';
+  } else {
+    statusBadge = '<span class="badge badge-secondary">⚪ Stopped</span>';
+  }
+
+  statusEl.innerHTML = statusBadge;
+  checkEl.textContent = botData.lastSuccessfulCheck ? fmtDateTime(botData.lastSuccessfulCheck) : '-';
+  updateEl.textContent = botData.lastUpdate ? fmtDateTime(botData.lastUpdate) : '-';
+  attemptsEl.textContent = botData.reconnectAttempts || 0;
+  
+  if (botData.lastError) {
+    errorEl.textContent = botData.lastError;
+    errorEl.classList.remove('text-muted');
+    errorEl.style.color = 'var(--text-danger)';
+  } else {
+    errorEl.textContent = '-';
+    errorEl.classList.add('text-muted');
+    errorEl.style.color = '';
   }
 }
 

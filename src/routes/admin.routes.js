@@ -2139,6 +2139,8 @@ router.post('/storage/cleanup', authMiddleware, activeBotMiddleware, async (req,
 // 6. SYSTEM INFO
 router.get('/system/info', authMiddleware, async (req, res, next) => {
   try {
+    const { telegramBotManager } = await import('../bot/bot.js');
+    const health = await telegramBotManager.healthCheck();
     res.json({
       status: 'success',
       nodeVersion: process.version,
@@ -2147,6 +2149,8 @@ router.get('/system/info', authMiddleware, async (req, res, next) => {
       memoryUsage: process.memoryUsage(),
       uptime: process.uptime(),
       dbStatus: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
+      userBot: health.userBot,
+      adminBot: health.adminBot
     });
   } catch (err) {
     next(err);
