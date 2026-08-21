@@ -413,21 +413,23 @@ router.get('/dashboard', authMiddleware, activeBotMiddleware, async (req, res, n
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    const userQuery = req.botId ? { botId: { $in: [req.botId, null] } } : {};
+    // Strict bot-scoped queries — no null fallback to avoid cross-bot data leaks
+    const userQuery = req.botId ? { botId: req.botId } : {};
+    const contentQuery = req.botId ? { botId: req.botId } : {};
 
     const totalUsers = await User.countDocuments(userQuery);
     const activeUsers = await User.countDocuments({ ...userQuery, status: 'active' });
     const usersToday = await User.countDocuments({ ...userQuery, createdAt: { $gte: startOfToday } });
     
-    const totalCategories = await Category.countDocuments(userQuery);
-    const totalContent = await Content.countDocuments(userQuery);
-    const activeContent = await Content.countDocuments({ ...userQuery, status: 'active' });
-    const startContentCount = await Content.countDocuments({ ...userQuery, isStartContent: true, status: 'active' });
-    const pendingDeletions = await Delivery.countDocuments({ ...userQuery, status: 'sent', deleteAt: { $gt: now } });
+    const totalCategories = await Category.countDocuments(contentQuery);
+    const totalContent = await Content.countDocuments(contentQuery);
+    const activeContent = await Content.countDocuments({ ...contentQuery, status: 'active' });
+    const startContentCount = await Content.countDocuments({ ...contentQuery, isStartContent: true, status: 'active' });
+    const pendingDeletions = await Delivery.countDocuments({ ...contentQuery, status: 'sent', deleteAt: { $gt: now } });
 
     // Aggregate counts by type
     const contentByType = await Content.aggregate([
-      { $match: userQuery },
+      { $match: contentQuery },
       { $group: { _id: '$type', count: { $sum: 1 } } }
     ]);
     const typeStats = contentByType.reduce((acc, curr) => {
@@ -436,14 +438,16 @@ router.get('/dashboard', authMiddleware, activeBotMiddleware, async (req, res, n
     }, { video: 0, photo: 0, document: 0, link: 0, text: 0 });
 
     // Recent Content
-    const recentContent = await Content.find(userQuery)
+    const recentContent = await Content.find(contentQuery)
       .sort({ createdAt: -1 })
-      .limit(5);
+      .limit(5)
+      .lean();
 
     // Recent Users
     const recentUsers = await User.find(userQuery)
       .sort({ createdAt: -1 })
-      .limit(5);
+      .limit(5)
+      .lean();
 
     // Recent Activity
     const recentActivity = await ActivityLog.find() // ActivityLog typically lacks botId, leaving as is unless added
@@ -1396,24 +1400,31 @@ router.get('/users', authMiddleware, activeBotMiddleware, async (req, res, next)
     const page = Math.max(1, cleanQueryInt(req.query.page, 1));
     const limit = Math.max(1, Math.min(cleanQueryInt(req.query.limit, 25), 100)); // Hard capped at 100
 
-    const query = req.botId ? { botId: { $in: [req.botId, null] } } : {};
-    if (cleanStatus) query.status = cleanStatus;
+    // Strict botId filter — only users belonging to the active bot
+    // No null fallback to avoid showing legacy/orphan records from other bots
+    const query = req.botId ? { botId: req.botId } : {};
+    if (cleanStatus && cleanStatus !== 'all') query.status = cleanStatus;
     
     if (cleanSearch) {
       const escaped = escapeRegex(cleanSearch);
-      query.$or = [
+      const numericSearch = parseInt(cleanSearch, 10);
+      const orConditions = [
         { username: { $regex: escaped, $options: 'i' } },
         { firstName: { $regex: escaped, $options: 'i' } },
         { lastName: { $regex: escaped, $options: 'i' } },
-        { telegramUserId: isNaN(parseInt(cleanSearch, 10)) ? undefined : parseInt(cleanSearch, 10) }
-      ].filter(f => f !== undefined);
+      ];
+      if (!isNaN(numericSearch)) {
+        orConditions.push({ telegramUserId: numericSearch });
+      }
+      query.$or = orConditions;
     }
 
     const total = await User.countDocuments(query);
     const users = await User.find(query)
       .sort({ lastActiveAt: -1 })
       .skip((page - 1) * limit)
-      .limit(limit);
+      .limit(limit)
+      .lean();
 
     return res.json({
       status: 'success',
