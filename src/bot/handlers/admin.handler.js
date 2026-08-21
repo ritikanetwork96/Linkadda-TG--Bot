@@ -3551,7 +3551,52 @@ export async function handleAdminCallback(ctx) {
  * Message handler router for incoming text and media sent by authorized admins.
  * Directs updates to state machine buffers based on the admin's active state.
  */
+// Global queues for serializing admin messages to prevent race conditions during bulk media uploads
+global.adminMessageQueues = global.adminMessageQueues || {};
+
 export async function handleAdminMessage(ctx) {
+  if (!ctx.from) return;
+  if (!isAdmin(ctx)) {
+    return ctx.reply('Unauthorized. This is a private admin panel.').catch(() => {});
+  }
+  const adminId = ctx.from.id;
+
+  if (!global.adminMessageQueues[adminId]) {
+    global.adminMessageQueues[adminId] = [];
+  }
+
+  const queue = global.adminMessageQueues[adminId];
+
+  return new Promise((resolve, reject) => {
+    queue.push({ ctx, resolve, reject });
+    if (queue.length === 1) {
+      processAdminQueue(adminId);
+    }
+  });
+}
+
+async function processAdminQueue(adminId) {
+  const queue = global.adminMessageQueues[adminId];
+  if (!queue || queue.length === 0) return;
+
+  const { ctx, resolve, reject } = queue[0];
+  try {
+    const result = await handleAdminMessageInternal(ctx);
+    resolve(result);
+  } catch (err) {
+    console.error(`[AdminQueue] Error processing message for admin ${adminId}:`, err);
+    reject(err);
+  } finally {
+    queue.shift();
+    if (queue.length > 0) {
+      processAdminQueue(adminId);
+    } else {
+      delete global.adminMessageQueues[adminId];
+    }
+  }
+}
+
+async function handleAdminMessageInternal(ctx) {
   if (!ctx.from) return;
   if (!isAdmin(ctx)) {
     return ctx.reply('Unauthorized. This is a private admin panel.').catch(() => {});

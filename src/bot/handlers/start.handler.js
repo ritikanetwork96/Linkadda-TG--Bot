@@ -147,12 +147,22 @@ export async function startHandler(ctx) {
 
           for (const item of items) {
             if (item.type === 'text') {
-              await ctx.reply(item.text).catch(() => {});
+              const textContent = {
+                type: 'text',
+                text: item.text,
+                textEntities: item.textEntities || []
+              };
+              await telegramService.deliverContent(user._id, chatId, textContent, batchId, deleteAt, botId);
             } else if (item.mediaId) {
               const { Content } = await import('../../models/Content.js');
               const media = await Content.findById(item.mediaId);
               if (media) {
-                await telegramService.deliverContent(user._id, chatId, media, batchId, deleteAt, botId);
+                const deliveryMedia = {
+                  ...media.toObject(),
+                  caption: item.caption || media.caption || '',
+                  captionEntities: (item.captionEntities && item.captionEntities.length > 0) ? item.captionEntities : (media.captionEntities || [])
+                };
+                await telegramService.deliverContent(user._id, chatId, deliveryMedia, batchId, deleteAt, botId);
               }
             }
           }
