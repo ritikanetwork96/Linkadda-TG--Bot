@@ -477,22 +477,26 @@ router.get('/dashboard', authMiddleware, activeBotMiddleware, async (req, res, n
   }
 });
 
-router.get('/analytics', authMiddleware, async (req, res, next) => {
+router.get('/analytics', authMiddleware, activeBotMiddleware, async (req, res, next) => {
   try {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    // Strict bot-scoped query
+    const botQuery = req.botId ? { botId: req.botId } : {};
 
     // Basic event counts
-    const totalStarts = await EventLog.countDocuments({ eventType: 'user_started' });
-    const todayStarts = await EventLog.countDocuments({ eventType: 'user_started', timestamp: { $gte: startOfToday } });
-    const contentRequests = await EventLog.countDocuments({ eventType: 'content_requested' });
-    const contentDeliveries = await EventLog.countDocuments({ eventType: 'content_delivered' });
-    const searchCount = await EventLog.countDocuments({ eventType: 'search_performed' });
-    const deepLinkOpens = await EventLog.countDocuments({ eventType: 'deep_link_opened' });
+    const totalStarts = await EventLog.countDocuments({ ...botQuery, eventType: 'user_started' });
+    const todayStarts = await EventLog.countDocuments({ ...botQuery, eventType: 'user_started', timestamp: { $gte: startOfToday } });
+    const contentRequests = await EventLog.countDocuments({ ...botQuery, eventType: 'content_requested' });
+    const contentDeliveries = await EventLog.countDocuments({ ...botQuery, eventType: 'content_delivered' });
+    const searchCount = await EventLog.countDocuments({ ...botQuery, eventType: 'search_performed' });
+    const deepLinkOpens = await EventLog.countDocuments({ ...botQuery, eventType: 'deep_link_opened' });
 
     // Aggregate Top Content by successful deliveries
+    const matchStage = req.botId ? { eventType: 'content_delivered', targetId: { $ne: '' }, botId: req.botId } : { eventType: 'content_delivered', targetId: { $ne: '' } };
     const topContentAgg = await EventLog.aggregate([
-      { $match: { eventType: 'content_delivered', targetId: { $ne: '' } } },
+      { $match: matchStage },
       { $group: { _id: '$targetId', deliveries: { $sum: 1 } } },
       { $sort: { deliveries: -1 } },
       { $limit: 10 }
@@ -502,7 +506,7 @@ router.get('/analytics', authMiddleware, async (req, res, next) => {
     for (const item of topContentAgg) {
       if (mongoose.Types.ObjectId.isValid(item._id)) {
         const content = await Content.findById(item._id).select('title type');
-        const requests = await EventLog.countDocuments({ eventType: 'content_requested', targetId: item._id });
+        const requests = await EventLog.countDocuments({ ...botQuery, eventType: 'content_requested', targetId: item._id });
         topContent.push({
           title: content ? content.title : 'Deleted Content',
           type: content ? content.type : 'N/A',
@@ -513,8 +517,9 @@ router.get('/analytics', authMiddleware, async (req, res, next) => {
     }
 
     // Aggregate Top Categories by views/opens
+    const catMatchStage = req.botId ? { eventType: 'category_opened', targetId: { $ne: '' }, botId: req.botId } : { eventType: 'category_opened', targetId: { $ne: '' } };
     const topCategoriesAgg = await EventLog.aggregate([
-      { $match: { eventType: 'category_opened', targetId: { $ne: '' } } },
+      { $match: catMatchStage },
       { $group: { _id: '$targetId', views: { $sum: 1 } } },
       { $sort: { views: -1 } },
       { $limit: 10 }
@@ -524,9 +529,10 @@ router.get('/analytics', authMiddleware, async (req, res, next) => {
     for (const item of topCategoriesAgg) {
       if (mongoose.Types.ObjectId.isValid(item._id)) {
         const category = await Category.findById(item._id).select('name displayName');
-        const contents = await Content.find({ categoryId: item._id }).select('_id');
+        const contents = await Content.find({ ...botQuery, categoryId: item._id }).select('_id');
         const contentIds = contents.map(c => c._id.toString());
         const requests = await EventLog.countDocuments({
+          ...botQuery,
           eventType: 'content_requested',
           targetId: { $in: contentIds }
         });
@@ -540,7 +546,7 @@ router.get('/analytics', authMiddleware, async (req, res, next) => {
     }
 
     // Broadcast Performance Metrics
-    const broadcasts = await Broadcast.find()
+    const broadcasts = await Broadcast.find(botQuery)
       .sort({ createdAt: -1 })
       .limit(10)
       .select('title status targetedCount sentCount failedCount blockedCount createdAt');
@@ -1485,18 +1491,20 @@ router.patch('/users/:id/status', authMiddleware, async (req, res, next) => {
 // 8. BROADCAST SYSTEM
 // ==========================================
 
-router.get('/broadcasts', authMiddleware, async (req, res, next) => {
+router.get('/broadcasts', authMiddleware, activeBotMiddleware, async (req, res, next) => {
   try {
-    const broadcasts = await Broadcast.find().sort({ createdAt: -1 });
+    const query = req.botId ? { botId: req.botId } : {};
+    const broadcasts = await Broadcast.find(query).sort({ createdAt: -1 });
     return res.json({ status: 'success', broadcasts });
   } catch (error) {
     next(error);
   }
 });
 
-router.get('/broadcasts/:id', authMiddleware, async (req, res, next) => {
+router.get('/broadcasts/:id', authMiddleware, activeBotMiddleware, async (req, res, next) => {
   try {
-    const broadcast = await Broadcast.findById(req.params.id);
+    const query = req.botId ? { _id: req.params.id, botId: req.botId } : { _id: req.params.id };
+    const broadcast = await Broadcast.findOne(query);
     if (!broadcast) {
       return res.status(404).json({ status: 'error', message: 'Broadcast not found.' });
     }
@@ -1506,7 +1514,7 @@ router.get('/broadcasts/:id', authMiddleware, async (req, res, next) => {
   }
 });
 
-router.post('/broadcasts', authMiddleware, upload.single('file'), async (req, res, next) => {
+router.post('/broadcasts', authMiddleware, activeBotMiddleware, upload.single('file'), async (req, res, next) => {
   let uploadedKey = null;
   try {
     const { title, type, text, urlButtonLabel, urlButtonUrl, scheduledAt } = req.body;
@@ -1567,8 +1575,9 @@ router.post('/broadcasts', authMiddleware, upload.single('file'), async (req, re
       ? { label: urlButtonLabel, url: urlButtonUrl }
       : undefined;
 
-    // Retrieve targeted users (previously interacted and not blocked)
-    const eligibleUsers = await User.find({ status: 'active' });
+    // Retrieve targeted users belonging strictly to the active bot
+    const userQuery = req.botId ? { status: 'active', botId: req.botId } : { status: 'active' };
+    const eligibleUsers = await User.find(userQuery);
 
     const broadcast = await Broadcast.create({
       title,
@@ -1581,7 +1590,8 @@ router.post('/broadcasts', authMiddleware, upload.single('file'), async (req, re
       sentCount: 0,
       failedCount: 0,
       blockedCount: 0,
-      scheduledAt: parsedScheduledAt || undefined
+      scheduledAt: parsedScheduledAt || undefined,
+      botId: req.botId
     });
 
     await ActivityLog.log(

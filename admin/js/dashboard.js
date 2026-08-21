@@ -6,7 +6,7 @@ window.addEventListener('load-dashboard', async () => {
   const metricsContainer = document.getElementById('dashboard-metrics');
 
   // Show skeleton loading for metrics
-  metricsContainer.innerHTML = Array(5).fill(0).map(() => `
+  metricsContainer.innerHTML = Array(6).fill(0).map(() => `
     <div class="metric-card">
       <div class="skeleton" style="height:10px;width:60%;margin-bottom:0.6rem;"></div>
       <div class="skeleton" style="height:28px;width:40%;margin-bottom:0.4rem;"></div>
@@ -45,6 +45,24 @@ window.addEventListener('load-dashboard', async () => {
         <h3>Content Items</h3>
         <div class="value">${metrics.totalContent.toLocaleString()}</div>
         <div class="sub-value">${metrics.activeContent} active</div>
+      </div>
+      <div class="metric-card">
+        <span class="metric-dot cyan"></span>
+        <h3>Categories</h3>
+        <div class="value">${(metrics.totalCategories || 0).toLocaleString()}</div>
+        <div class="sub-value">Product folders</div>
+      </div>
+      <div class="metric-card">
+        <span class="metric-dot orange"></span>
+        <h3>Auto-Delete Queue</h3>
+        <div class="value">${(metrics.pendingDeletions || 0).toLocaleString()}</div>
+        <div class="sub-value">Messages in queue</div>
+      </div>
+      <div class="metric-card">
+        <span class="metric-dot amber"></span>
+        <h3>Start Items</h3>
+        <div class="value">${(metrics.startContentCount || 0).toLocaleString()}</div>
+        <div class="sub-value">Menu trigger items</div>
       </div>
     `;
 

@@ -225,6 +225,21 @@
         <!-- Metric cards filled via JS -->
       </div>
       
+      <!-- User Growth & Engagement Chart Card -->
+      <div class="card mb-6" style="padding: 1.5rem;">
+        <div class="d-flex justify-between align-center mb-4">
+          <h3 style="margin: 0; font-size: 1.15rem; font-weight: 600; background: linear-gradient(135deg, #FFF 0%, rgba(255,255,255,0.7) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">User growth & engagement</h3>
+          <select id="chartTimeSelect" class="form-select" style="width: auto; padding: 0.35rem 2rem 0.35rem 0.85rem; font-size: 0.8rem; border-radius: 8px; border-color: var(--border);">
+            <option value="7">Last 7 Days</option>
+            <option value="30">Last 30 Days</option>
+            <option value="90">Last 90 Days</option>
+          </select>
+        </div>
+        <div style="position: relative; height: 300px; width: 100%;">
+          <canvas id="userGrowthChart"></canvas>
+        </div>
+      </div>
+      
       <div class="row-split">
         <div>
           <h3 class="mb-4">Recent Users</h3>

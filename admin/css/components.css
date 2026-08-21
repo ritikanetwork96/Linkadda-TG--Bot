@@ -100,8 +100,11 @@
 }
 .metric-dot.green { background: var(--text-success); color: var(--text-success); }
 .metric-dot.blue  { background: var(--primary); color: var(--primary); }
-.metric-dot.purple{ background: var(--text-cyan); color: var(--text-cyan); }
-.metric-dot.amber { background: var(--warning); box-shadow: 0 0 8px rgba(245,158,11,0.4); }
+.metric-dot.purple{ background: var(--secondary); color: var(--secondary); }
+.metric-dot.cyan  { background: var(--text-cyan); color: var(--text-cyan); }
+.metric-dot.amber { background: var(--text-warning); color: var(--text-warning); }
+.metric-dot.orange{ background: var(--warning); color: var(--warning); }
+.metric-dot.red   { background: var(--danger); color: var(--danger); }
 
 /* =====================================================
    TABLES
