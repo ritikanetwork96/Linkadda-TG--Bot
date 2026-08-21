@@ -3714,6 +3714,8 @@ export async function handleAdminMessage(ctx) {
         let fileUniqueId = '';
         let caption = ctx.message.caption || '';
         let text = ctx.message.text || '';
+        let captionEntities = ctx.message.caption_entities || [];
+        let textEntities = ctx.message.entities || [];
         let mimeType = 'application/octet-stream';
         let fileSize = 0;
         let filename = 'file';
@@ -3790,6 +3792,7 @@ export async function handleAdminMessage(ctx) {
                 originalFileName: filename,
                 telegramFileUniqueId: fileUniqueId,
                 caption,
+                captionEntities,
                 status: 'active',
                 botId: ctx.state.botId
               });
@@ -3814,7 +3817,9 @@ export async function handleAdminMessage(ctx) {
           mediaId: contentId,
           text: type === 'text' ? text : '',
           caption: type !== 'text' ? caption : '',
-          sortOrder: freshSession.linkDraft.items.length
+          sortOrder: freshSession.linkDraft.items.length,
+          captionEntities: type !== 'text' ? captionEntities : undefined,
+          textEntities: type === 'text' ? textEntities : undefined
         };
 
         freshSession.linkDraft.items.push(newItem);

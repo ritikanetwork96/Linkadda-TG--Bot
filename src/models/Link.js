@@ -5,7 +5,9 @@ const linkItemSchema = new mongoose.Schema({
   mediaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Content', default: null },
   text: { type: String, default: '' },
   caption: { type: String, default: '' },
-  sortOrder: { type: Number, default: 0 }
+  sortOrder: { type: Number, default: 0 },
+  captionEntities: { type: Array, default: undefined },
+  textEntities: { type: Array, default: undefined }
 });
 
 const linkSchema = new mongoose.Schema(

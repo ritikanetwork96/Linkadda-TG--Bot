@@ -57,7 +57,12 @@ export const telegramService = {
 
     if (finalCaption) {
       sendOptions.caption = finalCaption;
-      sendOptions.parse_mode = 'HTML';
+      const isOverride = options.captionOverride !== undefined && options.captionOverride !== null;
+      if (!isOverride && content.captionEntities && content.captionEntities.length > 0) {
+        sendOptions.caption_entities = content.captionEntities;
+      } else {
+        sendOptions.parse_mode = 'HTML';
+      }
     }
 
     if (content.replyMarkup) {
@@ -101,10 +106,15 @@ export const telegramService = {
       }
       case 'text': {
         const textOptions = { ...sendOptions };
-        textOptions.parse_mode = 'HTML';
         let textToSend = content.text || '';
         if (deleteNotice) {
           textToSend += deleteNotice;
+        }
+        if (content.textEntities && content.textEntities.length > 0) {
+          textOptions.entities = content.textEntities;
+          delete textOptions.parse_mode;
+        } else {
+          textOptions.parse_mode = 'HTML';
         }
         sentMessage = await telegram.sendMessage(chatId, textToSend, textOptions);
         break;
@@ -172,6 +182,12 @@ export const telegramService = {
       };
       if (caption) {
         mediaItem.caption = caption;
+        const isOverride = item.captionOverride !== undefined && item.captionOverride !== null;
+        if (!isOverride && content.captionEntities && content.captionEntities.length > 0) {
+          mediaItem.caption_entities = content.captionEntities;
+        } else {
+          mediaItem.parse_mode = 'HTML';
+        }
       }
       mediaList.push(mediaItem);
     }
