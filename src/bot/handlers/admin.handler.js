@@ -179,7 +179,7 @@ async function renderUsersList(ctx, page = 1) {
     const lastSeen = u.lastActiveAt
       ? new Date(u.lastActiveAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
       : 'N/A';
-    text += `\n${status} <b>${escapeHtml(name)}</b>  ${escapeHtml(handle)}\n`;
+    text += `\n${status} <b>${escapeHTML(name)}</b>  ${escapeHTML(handle)}\n`;
     text += `   Last seen: ${lastSeen}\n`;
   }
 
@@ -4008,67 +4008,88 @@ export async function handleAdminMessage(ctx) {
         global.pendingUploads[s3Key] = uploadPromise;
       }
 
-      let pack;
+      // Use a simple memory lock to prevent race conditions when processing Media Groups concurrently
       if (mediaGroupId) {
-        pack = await ContentPack.findOne({
-          botId: ctx.state.botId,
-          status: 'PENDING',
-          mediaGroupId,
-          createdAt: { $gte: new Date(Date.now() - 10000) }
-        });
+        global.mediaGroupLocks = global.mediaGroupLocks || {};
+        while (global.mediaGroupLocks[mediaGroupId]) {
+          await new Promise(r => setTimeout(r, 50));
+        }
+        global.mediaGroupLocks[mediaGroupId] = true;
       }
 
-      // Create Content item
-      const contentTimeStr = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' });
-      const content = await Content.create({
-        botId: ctx.state.botId,
-        title: `Forwarded Item (${contentTimeStr})`,
-        type,
-        storageKey: s3Key || (['photo', 'video', 'document'].includes(type) ? 'tg_forwarded_' + (fileId || crypto.randomBytes(8).toString('hex')) : undefined),
-        telegramFileId: undefined, // Do NOT store Admin Bot's fileId so User Bot always sends from S3 first!
-        telegramFileUniqueId: s3UniqueId || fileUniqueId || undefined,
-        caption: caption || undefined,
-        captionEntities,
-        textEntities,
-        replyMarkup,
-        text: text || undefined,
-        status: 'inactive'
-      });
-
-      if (pack) {
-        pack.items.push({
-          contentId: content._id,
-          sortOrder: pack.items.length,
-          enabled: true
-        });
-        pack.sourceMessageIds.push(ctx.message.message_id);
-        await pack.save();
-      } else {
-        let publicCode;
-        let isUnique = false;
-        while (!isUnique) {
-          publicCode = 'pack_' + crypto.randomBytes(3).toString('hex').toLowerCase();
-          const existing = await ContentPack.findOne({ botId: ctx.state.botId, publicCode });
-          if (!existing) isUnique = true;
+      let pack;
+      try {
+        if (mediaGroupId) {
+          pack = await ContentPack.findOne({
+            botId: ctx.state.botId,
+            status: 'PENDING',
+            mediaGroupId,
+            createdAt: { $gte: new Date(Date.now() - 10000) }
+          });
         }
 
-        const dateStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-        pack = await ContentPack.create({
+        // Create Content item
+        const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
+        const defaultTitle = caption 
+          ? (caption.length > 30 ? caption.substring(0, 30) + '...' : caption)
+          : `Forwarded ${typeLabel}`;
+
+        const content = await Content.create({
           botId: ctx.state.botId,
-          name: `Forwarded Message (${dateStr})`,
-          status: 'PENDING',
-          items: [{
-            contentId: content._id,
-            sortOrder: 0,
-            enabled: true
-          }],
-          publicCode,
-          sourceAdminId: adminId,
-          sourceMessageId: ctx.message.message_id,
-          sourceMessageIds: [ctx.message.message_id],
-          forwardDate: forwardDate ? new Date(forwardDate * 1000) : undefined,
-          mediaGroupId: mediaGroupId || undefined
+          title: defaultTitle,
+          type,
+          storageKey: s3Key || (['photo', 'video', 'document'].includes(type) ? 'tg_forwarded_' + (fileId || crypto.randomBytes(8).toString('hex')) : undefined),
+          storageBucket: config.filebase.bucket,
+          telegramFileId: undefined, // Do NOT store Admin Bot's fileId so User Bot always sends from S3 first!
+          telegramFileUniqueId: s3UniqueId || fileUniqueId || undefined,
+          caption: caption || undefined,
+          captionEntities,
+          textEntities,
+          replyMarkup,
+          text: text || undefined,
+          status: 'inactive'
         });
+
+        if (pack) {
+          pack.items.push({
+            contentId: content._id,
+            sortOrder: pack.items.length,
+            enabled: true
+          });
+          pack.sourceMessageIds.push(ctx.message.message_id);
+          await pack.save();
+        } else {
+          let publicCode;
+          let isUnique = false;
+          while (!isUnique) {
+            publicCode = 'pack_' + crypto.randomBytes(3).toString('hex').toLowerCase();
+            const existing = await ContentPack.findOne({ botId: ctx.state.botId, publicCode });
+            if (!existing) isUnique = true;
+          }
+
+          const dateStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+          pack = await ContentPack.create({
+            botId: ctx.state.botId,
+            name: `Forwarded Message (${dateStr})`,
+            status: 'PENDING',
+            items: [{
+              contentId: content._id,
+              sortOrder: 0,
+              enabled: true
+            }],
+            publicCode,
+            sourceAdminId: adminId,
+            sourceMessageId: ctx.message.message_id,
+            sourceMessageIds: [ctx.message.message_id],
+            mediaGroupId: mediaGroupId || undefined,
+            forwardDate: forwardDate ? new Date(forwardDate * 1000) : undefined,
+            isDemo: false
+          });
+        }
+      } finally {
+        if (mediaGroupId && global.mediaGroupLocks) {
+          delete global.mediaGroupLocks[mediaGroupId];
+        }
       }
 
       if (mediaGroupId) {
@@ -4726,6 +4747,7 @@ export async function handleAdminMessage(ctx) {
         type,
         categoryId: session.productDraft.categoryId,
         storageKey: s3Key,
+        storageBucket: config.filebase.bucket,
         telegramFileId: undefined, // User bot sends from S3 and registers file_id
         telegramFileUniqueId: s3UniqueId,
         caption: caption || undefined,

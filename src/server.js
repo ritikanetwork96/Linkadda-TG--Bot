@@ -8,6 +8,7 @@ import { Setting } from './models/Setting.js';
 import { startDeletionScheduler, stopDeletionScheduler } from './scheduler/deletion.scheduler.js';
 import { startExpiryScheduler, stopExpiryScheduler } from './scheduler/expiry.scheduler.js';
 import { hashPassword, decrypt } from './config/crypto.js';
+import mongoose from 'mongoose';
 
 let server;
 
@@ -19,6 +20,40 @@ async function bootstrap() {
 
     // 2. Connect MongoDB Atlas
     await connectDatabase();
+
+    // 2b. Database migration: ensure storageBucket is set and clean, and clean up S3 titles
+    try {
+      const { Content } = await import('./models/Content.js');
+      
+      // Clean S3 bucket name if configured as a URL in env
+      let bucketName = config.filebase.bucket || 'linkadda-bot';
+      if (bucketName.startsWith('http')) {
+        let clean = bucketName.replace(/^https?:\/\//i, '');
+        bucketName = clean.split('.')[0];
+      }
+
+      // Update missing or null storageBucket
+      await Content.updateMany(
+        { $or: [{ storageBucket: { $exists: false } }, { storageBucket: null }, { storageBucket: '' }] },
+        { $set: { storageBucket: bucketName } }
+      );
+      
+      // If any storageBucket contains 'https://' because of previous migration, clean it up
+      await Content.updateMany(
+        { storageBucket: /https?:\/\// },
+        { $set: { storageBucket: bucketName } }
+      );
+
+      // Clean up legacy/system-generated titles (e.g. S3 Auto-Imported)
+      const systemTitledContents = await Content.find({ title: /^(S3 Auto-Imported|Imported S3 Item)/ });
+      for (const item of systemTitledContents) {
+        const typeLabel = item.type.charAt(0).toUpperCase() + item.type.slice(1);
+        item.title = `Forwarded ${typeLabel}`;
+        await item.save();
+      }
+    } catch (migErr) {
+      console.error('Migration: database startup migration failed:', migErr.message);
+    }
 
     // 3. Ensure Admin account is seeded
     const adminCount = await Admin.countDocuments();

@@ -45,6 +45,72 @@ const escapeRegex = (string) => {
   return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
 };
 
+let s3SyncCache = {
+  lastSyncTime: 0,
+  promise: null
+};
+
+const syncS3ToDatabase = async (botId) => {
+  if (!botId) return;
+  
+  const now = Date.now();
+  if (now - s3SyncCache.lastSyncTime < 10000) {
+    return s3SyncCache.promise;
+  }
+  
+  s3SyncCache.lastSyncTime = now;
+  s3SyncCache.promise = (async () => {
+    try {
+      console.log('S3-to-DB Sync: Scanning Filebase S3 bucket for uploaded files...');
+      const s3Objects = await storageService.listObjects('tg_forwarded_');
+      if (!s3Objects || s3Objects.length === 0) {
+        console.log('S3-to-DB Sync: No objects found in S3.');
+        return;
+      }
+
+      console.log(`S3-to-DB Sync: Found ${s3Objects.length} objects. Syncing missing items...`);
+      for (const obj of s3Objects) {
+        const key = obj.Key;
+        const exists = await Content.findOne({ storageKey: key });
+        if (!exists) {
+          let type = 'photo';
+          let mimeType = 'image/jpeg';
+          try {
+            const meta = await storageService.headObject(key);
+            mimeType = meta.ContentType || 'image/jpeg';
+            if (mimeType.includes('video')) {
+              type = 'video';
+            } else if (mimeType.includes('document')) {
+              type = 'document';
+            }
+          } catch (e) {
+            console.error(`S3-to-DB Sync: Failed to fetch metadata for key ${key}:`, e.message);
+          }
+
+          const IndiaTime = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+          await Content.create({
+            botId,
+            title: `Forwarded ${type.charAt(0).toUpperCase() + type.slice(1)}`,
+            type,
+            storageKey: key,
+            telegramFileUniqueId: key.replace('tg_forwarded_', ''),
+            status: 'active',
+            mimeType,
+            fileSize: obj.Size || 0
+          });
+          console.log(`S3-to-DB Sync: Imported key "${key}" as "${type}"`);
+        }
+      }
+      console.log('S3-to-DB Sync: Finished.');
+    } catch (err) {
+      console.error('S3-to-DB Sync Failed:', err.message);
+    }
+  })();
+  
+  return s3SyncCache.promise;
+};
+
 // Help sanitize query parameters to string values only (prevents NoSQL injection objects)
 const cleanQueryString = (val) => {
   if (val === undefined || val === null) return '';
@@ -68,7 +134,7 @@ router.param('id', (req, res, next, id) => {
 // Bot isolation middleware extracting active bot from header or DB status
 const activeBotMiddleware = async (req, res, next) => {
   try {
-    const xBotId = req.headers['x-bot-id'];
+    const xBotId = req.headers['x-bot-id'] || req.headers['x-active-bot-id'];
     if (xBotId && mongoose.Types.ObjectId.isValid(xBotId)) {
       req.botId = new mongoose.Types.ObjectId(xBotId);
       return next();
@@ -341,23 +407,27 @@ router.post('/auth/reset-password', async (req, res, next) => {
 // 2. DASHBOARD METRICS
 // ==========================================
 
-router.get('/dashboard', authMiddleware, async (req, res, next) => {
+router.get('/dashboard', authMiddleware, activeBotMiddleware, async (req, res, next) => {
   try {
+    syncS3ToDatabase(req.botId);
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    const totalUsers = await User.countDocuments();
-    const activeUsers = await User.countDocuments({ status: 'active' });
-    const usersToday = await User.countDocuments({ createdAt: { $gte: startOfToday } });
+    const userQuery = req.botId ? { botId: { $in: [req.botId, null] } } : {};
+
+    const totalUsers = await User.countDocuments(userQuery);
+    const activeUsers = await User.countDocuments({ ...userQuery, status: 'active' });
+    const usersToday = await User.countDocuments({ ...userQuery, createdAt: { $gte: startOfToday } });
     
-    const totalCategories = await Category.countDocuments();
-    const totalContent = await Content.countDocuments();
-    const activeContent = await Content.countDocuments({ status: 'active' });
-    const startContentCount = await Content.countDocuments({ isStartContent: true, status: 'active' });
-    const pendingDeletions = await Delivery.countDocuments({ status: 'sent', deleteAt: { $gt: now } });
+    const totalCategories = await Category.countDocuments(userQuery);
+    const totalContent = await Content.countDocuments(userQuery);
+    const activeContent = await Content.countDocuments({ ...userQuery, status: 'active' });
+    const startContentCount = await Content.countDocuments({ ...userQuery, isStartContent: true, status: 'active' });
+    const pendingDeletions = await Delivery.countDocuments({ ...userQuery, status: 'sent', deleteAt: { $gt: now } });
 
     // Aggregate counts by type
     const contentByType = await Content.aggregate([
+      { $match: userQuery },
       { $group: { _id: '$type', count: { $sum: 1 } } }
     ]);
     const typeStats = contentByType.reduce((acc, curr) => {
@@ -366,17 +436,17 @@ router.get('/dashboard', authMiddleware, async (req, res, next) => {
     }, { video: 0, photo: 0, document: 0, link: 0, text: 0 });
 
     // Recent Content
-    const recentContent = await Content.find()
+    const recentContent = await Content.find(userQuery)
       .sort({ createdAt: -1 })
       .limit(5);
 
     // Recent Users
-    const recentUsers = await User.find()
+    const recentUsers = await User.find(userQuery)
       .sort({ createdAt: -1 })
       .limit(5);
 
     // Recent Activity
-    const recentActivity = await ActivityLog.find()
+    const recentActivity = await ActivityLog.find() // ActivityLog typically lacks botId, leaving as is unless added
       .populate('adminId', 'name email')
       .sort({ timestamp: -1 })
       .limit(10);
@@ -594,16 +664,17 @@ router.post('/bots', authMiddleware, async (req, res, next) => {
 // 4. CATEGORY MANAGEMENT
 // ==========================================
 
-router.get('/categories', authMiddleware, async (req, res, next) => {
+router.get('/categories', authMiddleware, activeBotMiddleware, async (req, res, next) => {
   try {
-    const categories = await Category.find().sort({ sortOrder: 1, name: 1 });
+    const query = req.botId ? { botId: { $in: [req.botId, null] } } : {};
+    const categories = await Category.find(query).sort({ sortOrder: 1, name: 1 });
     return res.json({ status: 'success', categories });
   } catch (error) {
     next(error);
   }
 });
 
-router.post('/categories', authMiddleware, async (req, res, next) => {
+router.post('/categories', authMiddleware, activeBotMiddleware, async (req, res, next) => {
   try {
     const { name, slug, description, status, sortOrder, icon, displayName, isFeatured } = req.body;
     const adminId = req.admin.id;
@@ -612,13 +683,17 @@ router.post('/categories', authMiddleware, async (req, res, next) => {
       return res.status(400).json({ status: 'error', message: 'Name and slug are required.' });
     }
 
-    // Check slug uniqueness
-    const exists = await Category.findOne({ slug: slug.toLowerCase() });
+    // Check slug uniqueness per bot (allowing fallback to legacy)
+    const exists = await Category.findOne({ 
+      slug: slug.toLowerCase(), 
+      botId: req.botId ? { $in: [req.botId, null] } : null 
+    });
     if (exists) {
       return res.status(400).json({ status: 'error', message: 'A category with this slug already exists.' });
     }
 
     const category = await Category.create({
+      botId: req.botId,
       name,
       slug: slug.toLowerCase(),
       description,
@@ -637,14 +712,18 @@ router.post('/categories', authMiddleware, async (req, res, next) => {
   }
 });
 
-router.patch('/categories/:id', authMiddleware, async (req, res, next) => {
+router.patch('/categories/:id', authMiddleware, activeBotMiddleware, async (req, res, next) => {
   try {
     const { id } = req.params;
     const { name, slug, description, status, sortOrder, icon, displayName, isFeatured } = req.body;
     const adminId = req.admin.id;
 
     if (slug) {
-      const exists = await Category.findOne({ slug: slug.toLowerCase(), _id: { $ne: id } });
+      const exists = await Category.findOne({ 
+        slug: slug.toLowerCase(), 
+        _id: { $ne: id },
+        botId: req.botId ? { $in: [req.botId, null] } : null
+      });
       if (exists) {
         return res.status(400).json({ status: 'error', message: 'A category with this slug already exists.' });
       }
@@ -678,7 +757,7 @@ router.patch('/categories/:id', authMiddleware, async (req, res, next) => {
   }
 });
 
-router.delete('/categories/:id', authMiddleware, async (req, res, next) => {
+router.delete('/categories/:id', authMiddleware, activeBotMiddleware, async (req, res, next) => {
   try {
     const { id } = req.params;
     const adminId = req.admin.id;
@@ -790,8 +869,9 @@ router.post('/content/bulk', authMiddleware, activeBotMiddleware, async (req, re
   }
 });
 
-router.get('/content', authMiddleware, async (req, res, next) => {
+router.get('/content', authMiddleware, activeBotMiddleware, async (req, res, next) => {
   try {
+    syncS3ToDatabase(req.botId);
     const cleanCategoryId = cleanQueryString(req.query.categoryId);
     const cleanType = cleanQueryString(req.query.type);
     const cleanStatus = cleanQueryString(req.query.status);
@@ -800,7 +880,7 @@ router.get('/content', authMiddleware, async (req, res, next) => {
     const page = Math.max(1, cleanQueryInt(req.query.page, 1));
     const limit = Math.max(1, Math.min(cleanQueryInt(req.query.limit, 25), 100)); // Hard capped at 100
 
-    const query = {};
+    const query = { botId: { $in: [req.botId, null] } };
     if (cleanCategoryId) {
       if (mongoose.Types.ObjectId.isValid(cleanCategoryId)) {
         query.categoryId = cleanCategoryId;
@@ -813,7 +893,13 @@ router.get('/content', authMiddleware, async (req, res, next) => {
       }
     }
 
-    if (cleanType) query.type = cleanType;
+    if (cleanType) {
+      if (cleanType.includes(',')) {
+        query.type = { $in: cleanType.split(',').map(t => t.trim()) };
+      } else {
+        query.type = cleanType;
+      }
+    }
     if (cleanStatus) query.status = cleanStatus;
     
     if (cleanSearch) {
@@ -1302,7 +1388,7 @@ router.get('/system/sessions', authMiddleware, async (req, res, next) => {
 // 7. BOT USERS LIST
 // ==========================================
 
-router.get('/users', authMiddleware, async (req, res, next) => {
+router.get('/users', authMiddleware, activeBotMiddleware, async (req, res, next) => {
   try {
     const cleanSearch = cleanQueryString(req.query.search);
     const cleanStatus = cleanQueryString(req.query.status);
@@ -1310,7 +1396,7 @@ router.get('/users', authMiddleware, async (req, res, next) => {
     const page = Math.max(1, cleanQueryInt(req.query.page, 1));
     const limit = Math.max(1, Math.min(cleanQueryInt(req.query.limit, 25), 100)); // Hard capped at 100
 
-    const query = {};
+    const query = req.botId ? { botId: { $in: [req.botId, null] } } : {};
     if (cleanStatus) query.status = cleanStatus;
     
     if (cleanSearch) {

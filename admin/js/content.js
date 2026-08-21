@@ -88,9 +88,9 @@ async function loadContentList() {
           <td>
             <div style="display:flex;align-items:center;gap:12px">
               ${previewHtml}
-              <div>
-                <div style="font-weight:600;color:var(--text)">${escapeHTML(item.title)}</div>
-                <small class="text-dim">${escapeHTML(item.originalFileName || item.url || 'Text content')}</small>
+              <div style="min-width:0; flex: 1;">
+                <div style="font-weight:600;color:var(--text)" class="text-truncate max-w-200">${escapeHTML(item.title)}</div>
+                <small class="text-dim text-truncate max-w-200" style="display:block;">${escapeHTML(item.originalFileName || item.url || 'Text content')}</small>
               </div>
             </div>
           </td>

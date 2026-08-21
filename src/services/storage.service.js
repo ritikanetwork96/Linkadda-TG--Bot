@@ -2,7 +2,8 @@ import {
   PutObjectCommand, 
   GetObjectCommand, 
   DeleteObjectCommand, 
-  HeadObjectCommand 
+  HeadObjectCommand,
+  ListObjectsV2Command
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { s3Client, storageConfig } from '../config/storage.js';
@@ -128,6 +129,27 @@ export const storageService = {
       return url;
     } catch (error) {
       console.error(`S3 Service: generatePresignedDownloadUrl failed for key ${key}: ${error.message}`);
+      throw error;
+    }
+  },
+
+  /**
+   * Lists objects in the S3 bucket
+   * @param {string} prefix
+   * @param {number} limit
+   * @returns {Promise<Array>}
+   */
+  async listObjects(prefix = '', limit = 100) {
+    try {
+      const command = new ListObjectsV2Command({
+        Bucket: storageConfig.bucketName,
+        Prefix: prefix,
+        MaxKeys: limit,
+      });
+      const result = await s3Client.send(command);
+      return result.Contents || [];
+    } catch (error) {
+      console.error(`S3 Service: listObjects failed: ${error.message}`);
       throw error;
     }
   }

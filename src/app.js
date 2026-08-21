@@ -33,7 +33,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:", "https://*.filebase.com", "https://*.filebase.io", "https://*.amazonaws.com"],
@@ -133,6 +133,8 @@ app.use('/admin', express.static(path.resolve(__dirname, '../admin')));
 app.use('/', healthRoutes);
 app.use('/', linkRoutes);
 app.use('/api/admin', adminRoutes);
+
+
 
 // 7. Centralized Error Handler
 app.use(errorMiddleware);
