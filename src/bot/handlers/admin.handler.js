@@ -3867,6 +3867,7 @@ async function handleAdminMessageInternal(ctx) {
                 fileSize,
                 originalFileName: filename,
                 telegramFileUniqueId: fileUniqueId,
+                adminTelegramFileId: fileId || undefined,
                 caption,
                 captionEntities,
                 status: 'active',
@@ -4150,6 +4151,7 @@ async function handleAdminMessageInternal(ctx) {
           storageKey: s3Key || (['photo', 'video', 'document'].includes(type) ? 'tg_forwarded_' + (fileId || crypto.randomBytes(8).toString('hex')) : undefined),
           storageBucket: config.filebase.bucket,
           telegramFileId: undefined, // Do NOT store Admin Bot's fileId so User Bot always sends from S3 first!
+          adminTelegramFileId: fileId || undefined, // Store Admin Bot's fileId for previewing/copying
           telegramFileUniqueId: s3UniqueId || fileUniqueId || undefined,
           caption: caption || undefined,
           captionEntities,
@@ -4996,12 +4998,52 @@ async function showPendingPreview(ctx, pack, session) {
 
     await ctx.reply('📦 <b>NEW POST RECEIVED</b>', { parse_mode: 'HTML' }).catch(() => {});
     
-    if (pack.sourceMessageIds && pack.sourceMessageIds.length > 0) {
-      for (const msgId of pack.sourceMessageIds) {
-        await ctx.telegram.copyMessage(ctx.chat.id, ctx.chat.id, msgId).catch(() => {});
+    if (pack.mediaGroupId) {
+      const mediaList = [];
+      for (const item of pack.items) {
+        const content = await Content.findById(item.contentId);
+        if (content && ['photo', 'video'].includes(content.type)) {
+          const fileSource = content.adminTelegramFileId || content.telegramFileId || (await storageService.generatePresignedDownloadUrl(content.storageKey));
+          const mediaItem = {
+            type: content.type,
+            media: fileSource
+          };
+          if (content.caption) {
+            mediaItem.caption = content.caption;
+            if (content.captionEntities && content.captionEntities.length > 0) {
+              mediaItem.caption_entities = content.captionEntities;
+            } else {
+              mediaItem.parse_mode = 'HTML';
+            }
+          }
+          mediaList.push(mediaItem);
+        }
       }
-    } else if (pack.sourceMessageId) {
-      await ctx.telegram.copyMessage(ctx.chat.id, ctx.chat.id, pack.sourceMessageId).catch(() => {});
+
+      if (mediaList.length > 0) {
+        await ctx.telegram.sendMediaGroup(ctx.chat.id, mediaList).catch(async (err) => {
+          console.error('showPendingPreview: sendMediaGroup failed, falling back to copyMessage:', err.message);
+          if (pack.sourceMessageIds && pack.sourceMessageIds.length > 0) {
+            for (const msgId of pack.sourceMessageIds) {
+              await ctx.telegram.copyMessage(ctx.chat.id, ctx.chat.id, msgId).catch(() => {});
+            }
+          }
+        });
+      } else {
+        if (pack.sourceMessageIds && pack.sourceMessageIds.length > 0) {
+          for (const msgId of pack.sourceMessageIds) {
+            await ctx.telegram.copyMessage(ctx.chat.id, ctx.chat.id, msgId).catch(() => {});
+          }
+        }
+      }
+    } else {
+      if (pack.sourceMessageIds && pack.sourceMessageIds.length > 0) {
+        for (const msgId of pack.sourceMessageIds) {
+          await ctx.telegram.copyMessage(ctx.chat.id, ctx.chat.id, msgId).catch(() => {});
+        }
+      } else if (pack.sourceMessageId) {
+        await ctx.telegram.copyMessage(ctx.chat.id, ctx.chat.id, pack.sourceMessageId).catch(() => {});
+      }
     }
 
     const text = `📦 <b>NEW POST PREVIEW</b>\n\n` +

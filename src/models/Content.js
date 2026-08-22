@@ -42,6 +42,10 @@ const contentSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    adminTelegramFileId: {
+      type: String,
+      trim: true,
+    },
     telegramFileUniqueId: {
       type: String,
       trim: true,
