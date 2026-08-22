@@ -3,6 +3,7 @@ import { config } from '../config/env.js';
 import { Delivery } from '../models/Delivery.js';
 import { Content } from '../models/Content.js';
 import { storageService } from './storage.service.js';
+import { storageConfig } from '../config/storage.js';
 
 const telegram = new Telegram(config.botToken);
 
@@ -72,7 +73,7 @@ export const telegramService = {
 
     switch (content.type) {
       case 'video': {
-        const fileSource = content.telegramFileId || (await storageService.generatePresignedDownloadUrl(content.storageKey));
+        const fileSource = content.telegramFileId || (content.storageKey ? `https://${storageConfig.bucketName}.s3.filebase.com/${content.storageKey}` : null);
         sentMessage = await telegram.sendVideo(chatId, fileSource, sendOptions);
         if (!content.telegramFileId && sentMessage.video) {
           await Content.findByIdAndUpdate(content._id, {
@@ -83,7 +84,7 @@ export const telegramService = {
         break;
       }
       case 'photo': {
-        const fileSource = content.telegramFileId || (await storageService.generatePresignedDownloadUrl(content.storageKey));
+        const fileSource = content.telegramFileId || (content.storageKey ? `https://${storageConfig.bucketName}.s3.filebase.com/${content.storageKey}` : null);
         sentMessage = await telegram.sendPhoto(chatId, fileSource, sendOptions);
         if (!content.telegramFileId && sentMessage.photo) {
           const largestPhoto = sentMessage.photo[sentMessage.photo.length - 1];
@@ -95,7 +96,7 @@ export const telegramService = {
         break;
       }
       case 'document': {
-        const fileSource = content.telegramFileId || (await storageService.generatePresignedDownloadUrl(content.storageKey));
+        const fileSource = content.telegramFileId || (content.storageKey ? `https://${storageConfig.bucketName}.s3.filebase.com/${content.storageKey}` : null);
         sentMessage = await telegram.sendDocument(chatId, fileSource, sendOptions);
         if (!content.telegramFileId && sentMessage.document) {
           await Content.findByIdAndUpdate(content._id, {
@@ -175,7 +176,7 @@ export const telegramService = {
       const caption = (item.captionOverride !== undefined && item.captionOverride !== null)
         ? item.captionOverride
         : content.caption;
-      const fileSource = content.telegramFileId || (await storageService.generatePresignedDownloadUrl(content.storageKey));
+      const fileSource = content.telegramFileId || (content.storageKey ? `https://${storageConfig.bucketName}.s3.filebase.com/${content.storageKey}` : null);
       
       const mediaItem = {
         type: content.type, // 'photo' or 'video'
