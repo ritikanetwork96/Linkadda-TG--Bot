@@ -339,7 +339,8 @@ async function renderMediaLibrary(ctx, type = 'all', page = 1, edit = false) {
 
       inline_keyboard.push([
         { text: `👁️ Preview ${item.title.substring(0, 15)}`, callback_data: `admin:med:prev:${item._id}:${type}:${page}` },
-        { text: `🔗 Copy Secure URL`, callback_data: `admin:med:copy:${item._id}` }
+        { text: `🔗 Copy URL`, callback_data: `admin:med:copy:${item._id}` },
+        { text: `🗑️ Delete`, callback_data: `admin:med:del_confirm:${item._id}:${type}:${page}` }
       ]);
     }
   }
@@ -1055,6 +1056,101 @@ export async function handleAdminCallback(ctx) {
         } else {
           await ctx.reply('⚠️ Preview unavailable (missing storage configuration and Telegram File ID).').catch(() => {});
         }
+        return;
+      }
+
+      // ── Delete Confirmation prompt ──────────────────────────────────────────
+      if (action === 'del_confirm') {
+        const mediaId = parts[3];
+        const type = parts[4];
+        const page = parseInt(parts[5] || '1', 10);
+
+        const media = await Content.findById(mediaId);
+        if (!media) {
+          return ctx.reply('⚠️ Media file not found or already deleted.').catch(() => {});
+        }
+
+        const sizeMB = media.fileSize ? `${(media.fileSize / (1024 * 1024)).toFixed(2)} MB` : 'Unknown';
+        const confirmText =
+          `🗑️ <b>Delete Media File?</b>\n\n` +
+          `<b>File:</b> <code>${escapeHTML(media.originalFileName || media.title)}</code>\n` +
+          `<b>Type:</b> ${media.type}\n` +
+          `<b>Size:</b> ${sizeMB}\n\n` +
+          `⚠️ This will permanently delete this file from <b>MongoDB</b> and <b>Filebase S3</b>.\n` +
+          `Any links using this file may break. Are you sure?`;
+
+        await ctx.reply(confirmText, {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '✅ Yes, Delete Permanently', callback_data: `admin:med:del_run:${mediaId}:${type}:${page}` },
+                { text: '❌ Cancel', callback_data: `admin:med:list:${type}:${page}` }
+              ]
+            ]
+          }
+        }).catch(() => {});
+        return;
+      }
+
+      // ── Delete Run — permanent delete from MongoDB + Filebase S3 ───────────
+      if (action === 'del_run') {
+        const mediaId = parts[3];
+        const type = parts[4];
+        const page = parseInt(parts[5] || '1', 10);
+
+        const media = await Content.findById(mediaId);
+        if (!media) {
+          await ctx.reply('⚠️ File not found — it may have already been deleted.').catch(() => {});
+          await renderMediaLibrary(ctx, type, page, false);
+          return;
+        }
+
+        let s3Deleted = false;
+        let s3Error = null;
+
+        // Step 1: Delete from Filebase S3 (safe — skips if another doc uses same key)
+        if (media.storageKey) {
+          try {
+            s3Deleted = await storageService.deleteObjectSafely(media.storageKey, media._id);
+          } catch (err) {
+            s3Error = err.message;
+            console.error(`admin:med:del_run — S3 delete failed for ${media.storageKey}:`, err.message);
+          }
+        }
+
+        // Step 2: Delete all delivery records for this content
+        const { Delivery } = await import('../../models/Delivery.js');
+        await Delivery.deleteMany({ contentId: media._id }).catch(() => {});
+
+        // Step 3: Delete the Content document from MongoDB
+        await Content.findByIdAndDelete(media._id);
+
+        // Step 4: Log the action
+        await logAdminActivity('MEDIA_DELETED', adminId, 'success', {
+          contentId: media._id,
+          title: media.title,
+          storageKey: media.storageKey,
+          s3Deleted
+        });
+
+        const s3Status = s3Error
+          ? `⚠️ S3 delete error: ${s3Error}`
+          : s3Deleted
+            ? '✅ Deleted from Filebase S3'
+            : 'ℹ️ S3 file kept (shared with other content)';
+
+        await ctx.reply(
+          `🗑️ <b>File Deleted Successfully</b>\n\n` +
+          `<b>File:</b> <code>${escapeHTML(media.originalFileName || media.title)}</code>\n` +
+          `<b>MongoDB:</b> ✅ Removed\n` +
+          `<b>Storage:</b> ${s3Status}`,
+          { parse_mode: 'HTML' }
+        ).catch(() => {});
+
+        // Refresh the media library list
+        const newPage = page > 1 ? page : 1;
+        await renderMediaLibrary(ctx, type, newPage, false);
         return;
       }
     }
