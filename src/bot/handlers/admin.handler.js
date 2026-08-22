@@ -3778,6 +3778,10 @@ async function handleAdminMessageInternal(ctx) {
       const mediaGroupId = ctx.message?.media_group_id;
       if (mediaGroupId) {
         global.linkDraftLocks = global.linkDraftLocks || {};
+        global.linkDraftPending = global.linkDraftPending || {};
+        // Count this item as in-flight BEFORE waiting for lock so the timer
+        // always sees at least 1 pending while any upload is running.
+        global.linkDraftPending[mediaGroupId] = (global.linkDraftPending[mediaGroupId] || 0) + 1;
         while (global.linkDraftLocks[mediaGroupId]) {
           await new Promise(r => setTimeout(r, 50));
         }
@@ -3906,12 +3910,23 @@ async function handleAdminMessageInternal(ctx) {
         await freshSession.save();
 
         if (mediaGroupId) {
+          // Decrement counter — this item's upload is now complete
+          global.linkDraftPending[mediaGroupId] = Math.max(0, (global.linkDraftPending[mediaGroupId] || 1) - 1);
+
           global.linkDraftTimers = global.linkDraftTimers || {};
           if (global.linkDraftTimers[mediaGroupId]) {
             clearTimeout(global.linkDraftTimers[mediaGroupId]);
           }
-          global.linkDraftTimers[mediaGroupId] = setTimeout(async () => {
+
+          // Helper that fires only when all uploads for this group are done
+          const sendGroupSuccess = async () => {
+            // If any item is still uploading, keep polling every 500ms
+            if ((global.linkDraftPending[mediaGroupId] || 0) > 0) {
+              global.linkDraftTimers[mediaGroupId] = setTimeout(sendGroupSuccess, 500);
+              return;
+            }
             delete global.linkDraftTimers[mediaGroupId];
+            delete global.linkDraftPending[mediaGroupId];
             const finalSession = await AdminSession.getSession(adminId);
             await ctx.reply(
               `✅ Media Group added successfully!\n\n` +
@@ -3928,7 +3943,10 @@ async function handleAdminMessageInternal(ctx) {
                 }
               }
             ).catch(() => {});
-          }, 1200);
+          };
+
+          // Wait 1500ms after the LAST finished upload, then check counter
+          global.linkDraftTimers[mediaGroupId] = setTimeout(sendGroupSuccess, 1500);
         } else {
           const typeLabels = { photo: 'Photo', video: 'Video', document: 'Document', text: 'Text message' };
           await ctx.reply(
