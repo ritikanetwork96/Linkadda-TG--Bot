@@ -23,7 +23,8 @@ export const telegramService = {
     let sentMessage = null;
     const sendOptions = {};
     
-    if (options.protectContent) {
+    const isAdmin = config.adminTelegramIds.map(String).includes(String(chatId));
+    if (!isAdmin || options.protectContent) {
       sendOptions.protect_content = true;
     }
 
@@ -192,8 +193,8 @@ export const telegramService = {
       mediaList.push(mediaItem);
     }
 
-    const sendOptions = {};
-    if (options.protectContent) {
+    const isAdmin = config.adminTelegramIds.map(String).includes(String(chatId));
+    if (!isAdmin || options.protectContent) {
       sendOptions.protect_content = true;
     }
 

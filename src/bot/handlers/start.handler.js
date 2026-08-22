@@ -150,50 +150,72 @@ export async function startHandler(ctx) {
 
           const flushMediaQueue = async () => {
             if (mediaQueue.length === 0) return;
-            if (mediaQueue.length === 1) {
-              const { resolvedContent, captionOverride } = mediaQueue[0];
-              const deliveryContent = { ...resolvedContent, caption: captionOverride ?? resolvedContent.caption };
-              await telegramService.deliverContent(user._id, chatId, deliveryContent, batchId, deleteAt, botId);
-              itemsSent++;
-            } else {
-              // Send in chunks of 10 (Telegram album limit)
-              for (let i = 0; i < mediaQueue.length; i += 10) {
-                const chunk = mediaQueue.slice(i, i + 10);
-                await telegramService.deliverMediaGroup(user._id, chatId, chunk, batchId, deleteAt, botId);
-                itemsSent += chunk.length;
+            try {
+              if (mediaQueue.length === 1) {
+                const { resolvedContent, captionOverride } = mediaQueue[0];
+                const deliveryContent = { ...resolvedContent, caption: captionOverride ?? resolvedContent.caption };
+                await telegramService.deliverContent(user._id, chatId, deliveryContent, batchId, deleteAt, botId);
+                itemsSent++;
+              } else {
+                // Send in chunks of 10 (Telegram album limit)
+                for (let i = 0; i < mediaQueue.length; i += 10) {
+                  const chunk = mediaQueue.slice(i, i + 10);
+                  try {
+                    await telegramService.deliverMediaGroup(user._id, chatId, chunk, batchId, deleteAt, botId);
+                    itemsSent += chunk.length;
+                  } catch (mediaGroupErr) {
+                    console.error(`flushMediaQueue: Failed to deliver media group chunk, retrying individually: ${mediaGroupErr.message}`);
+                    // Fallback: If group delivery fails, send each item in the chunk individually
+                    for (const item of chunk) {
+                      try {
+                        const deliveryContent = { ...item.resolvedContent, caption: item.captionOverride ?? item.resolvedContent.caption };
+                        await telegramService.deliverContent(user._id, chatId, deliveryContent, batchId, deleteAt, botId);
+                        itemsSent++;
+                      } catch (indivErr) {
+                        console.error(`flushMediaQueue: Individual fallback delivery failed for content ${item.resolvedContent?._id}: ${indivErr.message}`);
+                      }
+                    }
+                  }
+                }
               }
+            } catch (queueErr) {
+              console.error(`flushMediaQueue: Queue processing failed: ${queueErr.message}`);
             }
             mediaQueue = [];
           };
 
           for (const item of items) {
-            if (item.type === 'text') {
-              await flushMediaQueue();
-              const textContent = {
-                type: 'text',
-                text: item.text,
-                textEntities: item.textEntities || []
-              };
-              await telegramService.deliverContent(user._id, chatId, textContent, batchId, deleteAt, botId);
-              itemsSent++;
-            } else if (item.mediaId) {
-              const { Content } = await import('../../models/Content.js');
-              const media = await Content.findById(item.mediaId);
-              if (media) {
-                const captionOverride = item.caption !== undefined ? item.caption : null;
-                if (groupableTypes.includes(media.type)) {
-                  mediaQueue.push({ resolvedContent: media.toObject(), captionOverride });
-                } else {
-                  await flushMediaQueue();
-                  const deliveryContent = {
-                    ...media.toObject(),
-                    caption: item.caption ?? media.caption ?? '',
-                    captionEntities: (item.captionEntities && item.captionEntities.length > 0) ? item.captionEntities : (media.captionEntities || [])
-                  };
-                  await telegramService.deliverContent(user._id, chatId, deliveryContent, batchId, deleteAt, botId);
-                  itemsSent++;
+            try {
+              if (item.type === 'text') {
+                await flushMediaQueue();
+                const textContent = {
+                  type: 'text',
+                  text: item.text,
+                  textEntities: item.textEntities || []
+                };
+                await telegramService.deliverContent(user._id, chatId, textContent, batchId, deleteAt, botId);
+                itemsSent++;
+              } else if (item.mediaId) {
+                const { Content } = await import('../../models/Content.js');
+                const media = await Content.findById(item.mediaId);
+                if (media) {
+                  const captionOverride = item.caption !== undefined ? item.caption : null;
+                  if (groupableTypes.includes(media.type)) {
+                    mediaQueue.push({ resolvedContent: media.toObject(), captionOverride });
+                  } else {
+                    await flushMediaQueue();
+                    const deliveryContent = {
+                      ...media.toObject(),
+                      caption: item.caption ?? media.caption ?? '',
+                      captionEntities: (item.captionEntities && item.captionEntities.length > 0) ? item.captionEntities : (media.captionEntities || [])
+                    };
+                    await telegramService.deliverContent(user._id, chatId, deliveryContent, batchId, deleteAt, botId);
+                    itemsSent++;
+                  }
                 }
               }
+            } catch (itemErr) {
+              console.error(`Start Handler: Skipped item due to error: ${itemErr.message}`);
             }
           }
 
@@ -202,7 +224,7 @@ export async function startHandler(ctx) {
 
 
           if (itemsSent === 0) {
-            return ctx.reply('⚠️ This link is empty or its content has been deleted by the administrator.').catch(() => {});
+            return ctx.reply('⚠️ Failed to load content. Please try again later.').catch(() => {});
           }
         } catch (deliveryError) {
           console.error(`Start Handler: Failed to deliver link "${token}":`, deliveryError.message);
