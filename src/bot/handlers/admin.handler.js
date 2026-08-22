@@ -3873,162 +3873,178 @@ async function handleAdminMessageInternal(ctx) {
     if (session.state === 'LINK_DRAFT_ADD' || session.state === 'LINK_DRAFT_WAIT_NEXT' || (session.state === 'IDLE' && (ctx.message?.photo || ctx.message?.video || ctx.message?.document || (ctx.message?.text && !textMsg.startsWith('/'))))) {
       const mediaGroupId = ctx.message?.media_group_id;
       if (mediaGroupId) {
-        global.linkDraftLocks = global.linkDraftLocks || {};
         global.linkDraftPending = global.linkDraftPending || {};
-        // Count this item as in-flight BEFORE waiting for lock so the timer
-        // always sees at least 1 pending while any upload is running.
         global.linkDraftPending[mediaGroupId] = (global.linkDraftPending[mediaGroupId] || 0) + 1;
-        while (global.linkDraftLocks[mediaGroupId]) {
-          await new Promise(r => setTimeout(r, 50));
-        }
-        global.linkDraftLocks[mediaGroupId] = true;
       }
 
-      try {
-        let type = '';
-        let fileId = '';
-        let fileUniqueId = '';
-        let caption = ctx.message.caption || '';
-        let text = ctx.message.text || '';
-        let captionEntities = ctx.message.caption_entities || [];
-        let textEntities = ctx.message.entities || [];
-        let mimeType = 'application/octet-stream';
-        let fileSize = 0;
-        let filename = 'file';
+      const processUploadAndSave = async () => {
+        try {
+          let type = '';
+          let fileId = '';
+          let fileUniqueId = '';
+          let caption = ctx.message.caption || '';
+          let text = ctx.message.text || '';
+          let captionEntities = ctx.message.caption_entities || [];
+          let textEntities = ctx.message.entities || [];
+          let mimeType = 'application/octet-stream';
+          let fileSize = 0;
+          let filename = 'file';
 
-        if (ctx.message.photo) {
-          type = 'photo';
-          const p = ctx.message.photo[ctx.message.photo.length - 1];
-          fileId = p.file_id;
-          fileUniqueId = p.file_unique_id;
-          mimeType = 'image/jpeg';
-          filename = `photo_${fileUniqueId}.jpg`;
-        } else if (ctx.message.video) {
-          type = 'video';
-          fileId = ctx.message.video.file_id;
-          fileUniqueId = ctx.message.video.file_unique_id;
-          mimeType = ctx.message.video.mime_type || 'video/mp4';
-          filename = ctx.message.video.file_name || `video_${fileUniqueId}.mp4`;
-          fileSize = ctx.message.video.file_size || 0;
-        } else if (ctx.message.document) {
-          type = 'document';
-          fileId = ctx.message.document.file_id;
-          fileUniqueId = ctx.message.document.file_unique_id;
-          mimeType = ctx.message.document.mime_type || 'application/octet-stream';
-          filename = ctx.message.document.file_name || `doc_${fileUniqueId}`;
-          fileSize = ctx.message.document.file_size || 0;
-        } else if (ctx.message.text) {
-          type = 'text';
-        } else {
-          return ctx.reply('⚠️ Unsupported media type. Please send a Photo, Video, Document, or Text.').catch(() => {});
-        }
+          if (ctx.message.photo) {
+            type = 'photo';
+            const p = ctx.message.photo[ctx.message.photo.length - 1];
+            fileId = p.file_id;
+            fileUniqueId = p.file_unique_id;
+            mimeType = 'image/jpeg';
+            filename = `photo_${fileUniqueId}.jpg`;
+          } else if (ctx.message.video) {
+            type = 'video';
+            fileId = ctx.message.video.file_id;
+            fileUniqueId = ctx.message.video.file_unique_id;
+            mimeType = ctx.message.video.mime_type || 'video/mp4';
+            filename = ctx.message.video.file_name || `video_${fileUniqueId}.mp4`;
+            fileSize = ctx.message.video.file_size || 0;
+          } else if (ctx.message.document) {
+            type = 'document';
+            fileId = ctx.message.document.file_id;
+            fileUniqueId = ctx.message.document.file_unique_id;
+            mimeType = ctx.message.document.mime_type || 'application/octet-stream';
+            filename = ctx.message.document.file_name || `doc_${fileUniqueId}`;
+            fileSize = ctx.message.document.file_size || 0;
+          } else if (ctx.message.text) {
+            type = 'text';
+          } else {
+            return ctx.reply('⚠️ Unsupported media type. Please send a Photo, Video, Document, or Text.').catch(() => {});
+          }
 
-        // Fetch fresh session to ensure latest list of items (prevents overwrite due to async updates)
-        const freshSession = await AdminSession.getSession(adminId);
-        if (!freshSession.linkDraft || freshSession.linkDraft.status !== 'draft') {
-          freshSession.linkDraft = {
-            status: 'draft',
-            items: [],
-            expiresAt: null,
-            updatedAt: new Date()
-          };
-        }
+          // Fetch fresh session to ensure latest list of items (prevents overwrite due to async updates)
+          const freshSession = await AdminSession.getSession(adminId);
+          if (!freshSession.linkDraft || freshSession.linkDraft.status !== 'draft') {
+            freshSession.linkDraft = {
+              status: 'draft',
+              items: [],
+              expiresAt: null,
+              updatedAt: new Date()
+            };
+          }
 
-        let contentId = null;
+          let contentId = null;
 
-        if (type !== 'text') {
-          let contentDoc = await Content.findOne({ telegramFileUniqueId: fileUniqueId });
-          if (!contentDoc) {
-            const fileInfo = await ctx.telegram.getFile(fileId).catch(() => null);
-            const maxFileSizeLimit = (config.maxFileSizeMb || 20) * 1024 * 1024;
-            if (fileInfo && fileInfo.file_size && fileInfo.file_size > maxFileSizeLimit) {
-              return ctx.reply(`⚠️ File is too large. Configured limit is ${config.maxFileSizeMb || 20}MB.`).catch(() => {});
-            }
-            
-            const progressMsg = await ctx.reply(`⏳ Uploading ${filename} to S3...`).catch(() => null);
+          if (type !== 'text') {
+            let contentDoc = await Content.findOne({ telegramFileUniqueId: fileUniqueId });
+            if (!contentDoc) {
+              const fileInfo = await ctx.telegram.getFile(fileId).catch(() => null);
+              const maxFileSizeLimit = (config.maxFileSizeMb || 20) * 1024 * 1024;
+              if (fileInfo && fileInfo.file_size && fileInfo.file_size > maxFileSizeLimit) {
+                return ctx.reply(`⚠️ File is too large. Configured limit is ${config.maxFileSizeMb || 20}MB.`).catch(() => {});
+              }
+              
+              const progressMsg = await ctx.reply(`⏳ Uploading ${filename} to S3...`).catch(() => null);
 
-            try {
-              const fileLink = await ctx.telegram.getFileLink(fileId);
-              const response = await fetch(fileLink.href);
-              if (!response.ok) throw new Error(`Telegram CDN error: ${response.statusText}`);
+              try {
+                const fileLink = await ctx.telegram.getFileLink(fileId);
+                const response = await fetch(fileLink.href);
+                if (!response.ok) throw new Error(`Telegram CDN error: ${response.statusText}`);
 
-              const arrayBuffer = await response.arrayBuffer();
-              const buffer = Buffer.from(arrayBuffer);
+                const arrayBuffer = await response.arrayBuffer();
+                const buffer = Buffer.from(arrayBuffer);
 
-              const safeRandom = crypto.randomBytes(8).toString('hex');
-              const storageKey = `collections/${fileUniqueId || safeRandom}_${filename}`;
+                const safeRandom = crypto.randomBytes(8).toString('hex');
+                const storageKey = `collections/${fileUniqueId || safeRandom}_${filename}`;
 
-              await storageService.uploadObject(storageKey, buffer, mimeType);
+                await storageService.uploadObject(storageKey, buffer, mimeType);
 
-              contentDoc = await Content.create({
-                title: filename,
-                type,
-                storageKey,
-                storageBucket: config.filebase.bucket,
-                mimeType,
-                fileSize,
-                originalFileName: filename,
-                telegramFileUniqueId: fileUniqueId,
-                adminTelegramFileId: fileId || undefined,
-                caption,
-                captionEntities,
-                status: 'active',
-                botId: ctx.state.botId
-              });
-            } catch (err) {
-              console.error('S3 Collection Upload Failed:', err.message);
+                contentDoc = await Content.create({
+                  title: filename,
+                  type,
+                  storageKey,
+                  storageBucket: config.filebase.bucket,
+                  mimeType,
+                  fileSize,
+                  originalFileName: filename,
+                  telegramFileUniqueId: fileUniqueId,
+                  adminTelegramFileId: fileId || undefined,
+                  caption,
+                  captionEntities,
+                  status: 'active',
+                  botId: ctx.state.botId
+                });
+              } catch (err) {
+                console.error('S3 Collection Upload Failed:', err.message);
+                if (progressMsg) {
+                  await ctx.telegram.deleteMessage(ctx.chat.id, progressMsg.message_id).catch(() => {});
+                }
+                return ctx.reply(`❌ Failed to upload media to S3: ${err.message}`).catch(() => {});
+              }
+
               if (progressMsg) {
                 await ctx.telegram.deleteMessage(ctx.chat.id, progressMsg.message_id).catch(() => {});
               }
-              return ctx.reply(`❌ Failed to upload media to S3: ${err.message}`).catch(() => {});
             }
 
-            if (progressMsg) {
-              await ctx.telegram.deleteMessage(ctx.chat.id, progressMsg.message_id).catch(() => {});
-            }
+            contentId = contentDoc._id;
           }
 
-          contentId = contentDoc._id;
-        }
+          const newItem = {
+            type,
+            mediaId: contentId,
+            text: type === 'text' ? text : '',
+            caption: type !== 'text' ? caption : '',
+            sortOrder: freshSession.linkDraft.items.length,
+            captionEntities: type !== 'text' ? captionEntities : undefined,
+            textEntities: type === 'text' ? textEntities : undefined
+          };
 
-        const newItem = {
-          type,
-          mediaId: contentId,
-          text: type === 'text' ? text : '',
-          caption: type !== 'text' ? caption : '',
-          sortOrder: freshSession.linkDraft.items.length,
-          captionEntities: type !== 'text' ? captionEntities : undefined,
-          textEntities: type === 'text' ? textEntities : undefined
-        };
+          freshSession.linkDraft.items.push(newItem);
+          freshSession.linkDraft.updatedAt = new Date();
+          freshSession.state = 'LINK_DRAFT_ADD';
+          freshSession.markModified('linkDraft');
+          await freshSession.save();
 
-        freshSession.linkDraft.items.push(newItem);
-        freshSession.linkDraft.updatedAt = new Date();
-        freshSession.state = 'LINK_DRAFT_ADD';
-        freshSession.markModified('linkDraft');
-        await freshSession.save();
+          if (mediaGroupId) {
+            // Decrement counter — this item's upload is now complete
+            global.linkDraftPending[mediaGroupId] = Math.max(0, (global.linkDraftPending[mediaGroupId] || 1) - 1);
 
-        if (mediaGroupId) {
-          // Decrement counter — this item's upload is now complete
-          global.linkDraftPending[mediaGroupId] = Math.max(0, (global.linkDraftPending[mediaGroupId] || 1) - 1);
-
-          global.linkDraftTimers = global.linkDraftTimers || {};
-          if (global.linkDraftTimers[mediaGroupId]) {
-            clearTimeout(global.linkDraftTimers[mediaGroupId]);
-          }
-
-          // Helper that fires only when all uploads for this group are done
-          const sendGroupSuccess = async () => {
-            // If any item is still uploading, keep polling every 500ms
-            if ((global.linkDraftPending[mediaGroupId] || 0) > 0) {
-              global.linkDraftTimers[mediaGroupId] = setTimeout(sendGroupSuccess, 500);
-              return;
+            global.linkDraftTimers = global.linkDraftTimers || {};
+            if (global.linkDraftTimers[mediaGroupId]) {
+              clearTimeout(global.linkDraftTimers[mediaGroupId]);
             }
-            delete global.linkDraftTimers[mediaGroupId];
-            delete global.linkDraftPending[mediaGroupId];
-            const finalSession = await AdminSession.getSession(adminId);
+
+            // Helper that fires only when all uploads for this group are done
+            const sendGroupSuccess = async () => {
+              if ((global.linkDraftPending[mediaGroupId] || 0) > 0) {
+                global.linkDraftTimers[mediaGroupId] = setTimeout(sendGroupSuccess, 500);
+                return;
+              }
+              delete global.linkDraftTimers[mediaGroupId];
+              delete global.linkDraftPending[mediaGroupId];
+              if (global.linkDraftQueues) {
+                delete global.linkDraftQueues[mediaGroupId];
+              }
+              const finalSession = await AdminSession.getSession(adminId);
+              await ctx.reply(
+                `✅ Media Group added successfully!\n\n` +
+                `Total items in this link draft: <b>${finalSession.linkDraft.items.length}</b>`,
+                {
+                  parse_mode: 'HTML',
+                  reply_markup: {
+                    inline_keyboard: [
+                      [{ text: '➕ Add More', callback_data: 'admin:link:add_more' }],
+                      [{ text: '🚀 Direct Send', callback_data: 'admin:link:direct_init' }],
+                      [{ text: '🔗 Create Link', callback_data: 'admin:link:finalize' }],
+                      [{ text: '❌ Cancel', callback_data: 'admin:link:cancel' }]
+                    ]
+                  }
+                }
+              ).catch(() => {});
+            };
+
+            global.linkDraftTimers[mediaGroupId] = setTimeout(sendGroupSuccess, 1500);
+          } else {
+            const typeLabels = { photo: 'Photo', video: 'Video', document: 'Document', text: 'Text message' };
             await ctx.reply(
-              `✅ Media Group added successfully!\n\n` +
-              `Total items in this link draft: <b>${finalSession.linkDraft.items.length}</b>`,
+              `✅ ${typeLabels[type] || 'Item'} added successfully!\n\n` +
+              `Total items in this link draft: <b>${freshSession.linkDraft.items.length}</b>`,
               {
                 parse_mode: 'HTML',
                 reply_markup: {
@@ -4041,32 +4057,19 @@ async function handleAdminMessageInternal(ctx) {
                 }
               }
             ).catch(() => {});
-          };
+          }
+        } catch (processErr) {
+          console.error('processUploadAndSave failed:', processErr.message);
+        }
+      };
 
-          // Wait 1500ms after the LAST finished upload, then check counter
-          global.linkDraftTimers[mediaGroupId] = setTimeout(sendGroupSuccess, 1500);
-        } else {
-          const typeLabels = { photo: 'Photo', video: 'Video', document: 'Document', text: 'Text message' };
-          await ctx.reply(
-            `✅ ${typeLabels[type] || 'Item'} added successfully!\n\n` +
-            `Total items in this link draft: <b>${freshSession.linkDraft.items.length}</b>`,
-            {
-              parse_mode: 'HTML',
-              reply_markup: {
-                inline_keyboard: [
-                  [{ text: '➕ Add More', callback_data: 'admin:link:add_more' }],
-                  [{ text: '🚀 Direct Send', callback_data: 'admin:link:direct_init' }],
-                  [{ text: '🔗 Create Link', callback_data: 'admin:link:finalize' }],
-                  [{ text: '❌ Cancel', callback_data: 'admin:link:cancel' }]
-                ]
-              }
-            }
-          ).catch(() => {});
-        }
-      } finally {
-        if (mediaGroupId && global.linkDraftLocks) {
-          delete global.linkDraftLocks[mediaGroupId];
-        }
+      if (mediaGroupId) {
+        global.linkDraftQueues = global.linkDraftQueues || {};
+        global.linkDraftQueues[mediaGroupId] = (global.linkDraftQueues[mediaGroupId] || Promise.resolve())
+          .then(() => processUploadAndSave());
+        await global.linkDraftQueues[mediaGroupId];
+      } else {
+        await processUploadAndSave();
       }
       return;
     }
