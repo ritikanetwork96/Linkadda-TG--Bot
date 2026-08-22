@@ -280,7 +280,7 @@ async function renderMyLinks(ctx, page = 1, edit = false) {
 
     // Row of action buttons for each link
     inline_keyboard.push([
-      { text: `👁️ Preview`, url: finalUrl },
+      { text: `👁️ Preview`, callback_data: `admin:link:preview:${link.token}` },
       { text: toggleText, callback_data: `admin:link:toggle:${link.token}:${page}` },
       { text: `🗑️ Delete`, callback_data: `admin:link:delete:${link.token}:${page}` }
     ]);
@@ -923,10 +923,36 @@ export async function handleAdminCallback(ctx) {
         if (!link) {
           return ctx.reply('⚠️ Link not found.').catch(() => {});
         }
-        const activeBotDoc = await Bot.findOne({ status: 'active' });
-        const userBotUsername = activeBotDoc?.username || config.userBotUsername || ctx.botInfo.username;
-        const finalUrl = `https://t.me/${userBotUsername}?start=l_${token}`;
-        await ctx.reply(`👁️ <b>Preview Link:</b> ${finalUrl}`).catch(() => {});
+        
+        await ctx.reply(`👁️ <b>Previewing Content for Link <code>${link.token}</code>:</b>`, { parse_mode: 'HTML' }).catch(() => {});
+
+        const items = [...link.items].sort((a, b) => a.sortOrder - b.sortOrder);
+        
+        for (const item of items) {
+          try {
+            if (item.type === 'text') {
+              await ctx.reply(item.text, {
+                entities: item.textEntities
+              }).catch(() => {});
+            } else if (item.mediaId) {
+              const media = await Content.findById(item.mediaId);
+              if (media) {
+                const caption = item.caption || media.caption || '';
+                const entities = (item.captionEntities && item.captionEntities.length > 0) ? item.captionEntities : (media.captionEntities || []);
+                
+                if (media.type === 'photo') {
+                  await ctx.replyWithPhoto(media.telegramFileId, { caption, caption_entities: entities }).catch(() => {});
+                } else if (media.type === 'video') {
+                  await ctx.replyWithVideo(media.telegramFileId, { caption, caption_entities: entities }).catch(() => {});
+                } else if (media.type === 'document') {
+                  await ctx.replyWithDocument(media.telegramFileId, { caption, caption_entities: entities }).catch(() => {});
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Admin Preview item delivery error:', err.message);
+          }
+        }
         return;
       }
 
