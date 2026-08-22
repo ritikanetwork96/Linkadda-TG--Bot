@@ -102,4 +102,42 @@ router.get('/fix-user-index', async (req, res) => {
   }
 });
 
+/**
+ * Debug Endpoint to check DB connection info as seen by the running server.
+ */
+router.get('/api/debug-db', async (req, res) => {
+  try {
+    const { Link } = await import('../models/Link.js');
+    const { Content } = await import('../models/Content.js');
+    
+    const dbName = mongoose.connection.name;
+    const dbState = mongoose.connection.readyState;
+    const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+    
+    const totalLinks = await Link.countDocuments();
+    const totalContent = await Content.countDocuments();
+    
+    const lastLinks = await Link.find().sort({ createdAt: -1 }).limit(5).lean();
+    const lastContents = await Content.find().sort({ createdAt: -1 }).limit(5).lean();
+    
+    return res.json({
+      status: 'success',
+      database: {
+        name: dbName,
+        state: states[dbState] || 'unknown',
+        uriHost: mongoose.connection.host,
+      },
+      counts: {
+        links: totalLinks,
+        contents: totalContent
+      },
+      lastLinks,
+      lastContents
+    });
+  } catch (err) {
+    return res.status(500).json({ status: 'error', message: err.message, stack: err.stack });
+  }
+});
+
+
 export default router;
