@@ -929,7 +929,7 @@ router.get('/content', authMiddleware, activeBotMiddleware, async (req, res, nex
       if (obj.storageKey) {
         // Direct Filebase public URL — instant, no S3 round-trip
         const bucketName = (obj.storageBucket || '').replace(/^https?:\/\//i, '').split('.')[0] || 'linkadda-bot';
-        obj.downloadUrl = `https://${bucketName}.s3.filebase.com/${obj.storageKey}`;
+        obj.downloadUrl = `https://${bucketName}.s3.filebase.io/${obj.storageKey}`;
       }
       return obj;
     });
