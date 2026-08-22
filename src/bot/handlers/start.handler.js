@@ -145,6 +145,7 @@ export async function startHandler(ctx) {
           // Sort items by sortOrder
           const items = [...link.items].sort((a, b) => a.sortOrder - b.sortOrder);
 
+          let itemsSent = 0;
           for (const item of items) {
             if (item.type === 'text') {
               const textContent = {
@@ -153,6 +154,7 @@ export async function startHandler(ctx) {
                 textEntities: item.textEntities || []
               };
               await telegramService.deliverContent(user._id, chatId, textContent, batchId, deleteAt, botId);
+              itemsSent++;
             } else if (item.mediaId) {
               const { Content } = await import('../../models/Content.js');
               const media = await Content.findById(item.mediaId);
@@ -163,8 +165,13 @@ export async function startHandler(ctx) {
                   captionEntities: (item.captionEntities && item.captionEntities.length > 0) ? item.captionEntities : (media.captionEntities || [])
                 };
                 await telegramService.deliverContent(user._id, chatId, deliveryMedia, batchId, deleteAt, botId);
+                itemsSent++;
               }
             }
+          }
+
+          if (itemsSent === 0) {
+            return ctx.reply('⚠️ This link is empty or its content has been deleted by the administrator.').catch(() => {});
           }
         } catch (deliveryError) {
           console.error(`Start Handler: Failed to deliver link "${token}":`, deliveryError.message);
