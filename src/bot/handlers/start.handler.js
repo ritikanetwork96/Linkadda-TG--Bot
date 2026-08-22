@@ -145,9 +145,32 @@ export async function startHandler(ctx) {
           // Sort items by sortOrder
           const items = [...link.items].sort((a, b) => a.sortOrder - b.sortOrder);
 
+          // Group consecutive photo/video items into media groups (like deliverContentPack)
+          const groupableTypes = ['photo', 'video'];
+          let mediaQueue = []; // { resolvedContent, captionOverride }
           let itemsSent = 0;
+
+          const flushMediaQueue = async () => {
+            if (mediaQueue.length === 0) return;
+            if (mediaQueue.length === 1) {
+              const { resolvedContent, captionOverride } = mediaQueue[0];
+              const deliveryContent = { ...resolvedContent, caption: captionOverride ?? resolvedContent.caption };
+              await telegramService.deliverContent(user._id, chatId, deliveryContent, batchId, deleteAt, botId);
+              itemsSent++;
+            } else {
+              // Send in chunks of 10 (Telegram album limit)
+              for (let i = 0; i < mediaQueue.length; i += 10) {
+                const chunk = mediaQueue.slice(i, i + 10);
+                await telegramService.deliverMediaGroup(user._id, chatId, chunk, batchId, deleteAt, botId);
+                itemsSent += chunk.length;
+              }
+            }
+            mediaQueue = [];
+          };
+
           for (const item of items) {
             if (item.type === 'text') {
+              await flushMediaQueue();
               const textContent = {
                 type: 'text',
                 text: item.text,
@@ -159,16 +182,26 @@ export async function startHandler(ctx) {
               const { Content } = await import('../../models/Content.js');
               const media = await Content.findById(item.mediaId);
               if (media) {
-                const deliveryMedia = {
-                  ...media.toObject(),
-                  caption: item.caption || media.caption || '',
-                  captionEntities: (item.captionEntities && item.captionEntities.length > 0) ? item.captionEntities : (media.captionEntities || [])
-                };
-                await telegramService.deliverContent(user._id, chatId, deliveryMedia, batchId, deleteAt, botId);
-                itemsSent++;
+                const captionOverride = item.caption !== undefined ? item.caption : null;
+                if (groupableTypes.includes(media.type)) {
+                  mediaQueue.push({ resolvedContent: media.toObject(), captionOverride });
+                } else {
+                  await flushMediaQueue();
+                  const deliveryContent = {
+                    ...media.toObject(),
+                    caption: item.caption ?? media.caption ?? '',
+                    captionEntities: (item.captionEntities && item.captionEntities.length > 0) ? item.captionEntities : (media.captionEntities || [])
+                  };
+                  await telegramService.deliverContent(user._id, chatId, deliveryContent, batchId, deleteAt, botId);
+                  itemsSent++;
+                }
               }
             }
           }
+
+          // Flush any remaining media group
+          await flushMediaQueue();
+
 
           if (itemsSent === 0) {
             return ctx.reply('⚠️ This link is empty or its content has been deleted by the administrator.').catch(() => {});

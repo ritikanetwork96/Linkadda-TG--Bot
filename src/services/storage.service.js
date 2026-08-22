@@ -12,17 +12,19 @@ export const storageService = {
   /**
    * Uploads an object to Filebase S3
    * @param {string} key 
-   * @param {Buffer|Blob|string} body 
+   * @param {Buffer|Blob|string|ReadableStream} body 
    * @param {string} contentType 
+   * @param {object} [extraParams] - Optional extra S3 params (e.g. { ContentLength })
    * @returns {Promise<any>}
    */
-  async uploadObject(key, body, contentType) {
+  async uploadObject(key, body, contentType, extraParams = {}) {
     try {
       const command = new PutObjectCommand({
         Bucket: storageConfig.bucketName,
         Key: key,
         Body: body,
         ContentType: contentType,
+        ...extraParams,
       });
       const result = await s3Client.send(command);
       return result;
