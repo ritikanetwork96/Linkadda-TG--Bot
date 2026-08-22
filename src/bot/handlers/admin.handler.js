@@ -237,6 +237,9 @@ async function renderMyLinks(ctx, page = 1, edit = false) {
     }
   }
 
+  const activeBotDoc = await Bot.findOne({ status: 'active' });
+  const userBotUsername = activeBotDoc?.username || config.userBotUsername || ctx.botInfo.username;
+
   let text = `📦 <b>My Links (Page ${page}/${Math.ceil(total / limit)})</b>\n\n`;
   const inline_keyboard = [];
 
@@ -264,7 +267,9 @@ async function renderMyLinks(ctx, page = 1, edit = false) {
       }
     }
 
-    text += `• <b>Token:</b> <code>${link.token}</code>\n` +
+    const finalUrl = `https://t.me/${userBotUsername}?start=l_${link.token}`;
+
+    text += `• <b>Link:</b> ${finalUrl}\n` +
             `  <b>Created:</b> <code>${createdText}</code>\n` +
             `  <b>Items:</b> ${link.items.length}\n` +
             `  <b>Status:</b> ${statusLabel}\n` +
@@ -275,7 +280,7 @@ async function renderMyLinks(ctx, page = 1, edit = false) {
 
     // Row of action buttons for each link
     inline_keyboard.push([
-      { text: `👁️ Preview`, callback_data: `admin:link:preview:${link.token}` },
+      { text: `👁️ Preview`, url: finalUrl },
       { text: toggleText, callback_data: `admin:link:toggle:${link.token}:${page}` },
       { text: `🗑️ Delete`, callback_data: `admin:link:delete:${link.token}:${page}` }
     ]);

@@ -123,7 +123,7 @@ export async function startHandler(ctx) {
         const token = payload.substring(2);
         try {
           const { Link } = await import('../../models/Link.js');
-          const link = await Link.findOne({ token, $or: [{ botId }, { botId: { $exists: false } }] });
+          const link = await Link.findOne({ token });
 
           if (!link) {
             return ctx.reply('❌ This link is no longer available.').catch(() => {});
