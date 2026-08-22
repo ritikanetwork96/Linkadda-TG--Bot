@@ -28,7 +28,7 @@ export async function loadMediaGallery(page = 1) {
     }
   } catch (err) {
     container.innerHTML = `<div class="p-6 text-center text-red" style="grid-column: 1 / -1;">Error: ${err.message}</div>`;
-    Toast.show('Failed to load media gallery', 'error');
+    Toast.error('Gallery Error', 'Failed to load media gallery');
   }
 }
 
@@ -94,9 +94,9 @@ function renderMediaGallery(items) {
   container.querySelectorAll('.btn-copy-link').forEach(btn => {
     btn.addEventListener('click', () => {
       const url = btn.getAttribute('data-url');
-      if (!url) return Toast.show('URL not available', 'error');
+      if (!url) return Toast.error('Error', 'URL not available');
       navigator.clipboard.writeText(url).then(() => {
-        Toast.show('Media URL copied!', 'success');
+        Toast.success('Copied', 'Media URL copied!');
       });
     });
   });
@@ -115,7 +115,7 @@ function renderMediaGallery(items) {
       try {
         const res = await API.delete(`/content/${id}`);
         if (res.status === 'success') {
-          Toast.show(`🗑️ "${title}" deleted successfully.`, 'success');
+          Toast.success('Deleted', `"${title}" deleted successfully.`);
           // Smooth fade-out before DOM removal
           const card = container.querySelector(`.media-card[data-id="${id}"]`);
           if (card) {
@@ -128,13 +128,14 @@ function renderMediaGallery(items) {
           throw new Error(res.message || 'Delete failed');
         }
       } catch (err) {
-        Toast.show(`❌ Delete failed: ${err.message}`, 'error');
+        Toast.error('Delete Failed', err.message);
         btn.disabled = false;
         btn.textContent = '🗑️ Delete';
       }
     });
   });
 }
+
 
 function updateMediaPagination() {
   const prevBtn = document.getElementById('btn-media-prev');

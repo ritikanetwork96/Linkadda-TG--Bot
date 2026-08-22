@@ -3952,12 +3952,13 @@ async function handleAdminMessageInternal(ctx) {
               const response = await fetch(fileLink.href);
               if (!response.ok) throw new Error(`Telegram CDN error: ${response.statusText}`);
 
+              const arrayBuffer = await response.arrayBuffer();
+              const buffer = Buffer.from(arrayBuffer);
+
               const safeRandom = crypto.randomBytes(8).toString('hex');
               const storageKey = `collections/${fileUniqueId || safeRandom}_${filename}`;
 
-              // Stream directly from Telegram CDN to S3 — no RAM buffer needed
-              const uploadOpts = { ContentLength: fileInfo?.file_size || undefined };
-              await storageService.uploadObject(storageKey, response.body, mimeType, uploadOpts);
+              await storageService.uploadObject(storageKey, buffer, mimeType);
 
               contentDoc = await Content.create({
                 title: filename,
@@ -5264,6 +5265,9 @@ async function uploadTelegramFileToS3(ctx, fileId, type) {
       throw new Error(`Failed to download file from Telegram: ${response.statusText}`);
     }
 
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
     let mimeType = 'application/octet-stream';
     if (type === 'photo') mimeType = 'image/jpeg';
     else if (type === 'video') mimeType = 'video/mp4';
@@ -5271,9 +5275,7 @@ async function uploadTelegramFileToS3(ctx, fileId, type) {
     const fileUniqueId = fileInfo.file_unique_id || crypto.randomBytes(8).toString('hex');
     const storageKey = `tg_forwarded_${fileUniqueId}`;
 
-    // Stream directly from Telegram CDN to S3 — no RAM buffer needed
-    const uploadOpts = { ContentLength: fileInfo?.file_size || undefined };
-    await storageService.uploadObject(storageKey, response.body, mimeType, uploadOpts);
+    await storageService.uploadObject(storageKey, buffer, mimeType);
     return { storageKey, fileUniqueId };
   } catch (err) {
     console.error('Failed to upload Telegram file to S3:', err.message);
