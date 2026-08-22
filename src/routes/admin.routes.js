@@ -815,10 +815,19 @@ router.post('/content/bulk', authMiddleware, activeBotMiddleware, async (req, re
       affectedCount = items.length;
       
       const batchSize = 5;
+      let skippedCount = 0;
       for (let i = 0; i < items.length; i += batchSize) {
         const batch = items.slice(i, i + batchSize);
         await Promise.all(batch.map(async (item) => {
           try {
+            // Check active references
+            const isLinked = await Link.findOne({ 'items.mediaId': item._id, status: 'active' });
+            const isPacked = await ContentPack.findOne({ 'items.contentId': item._id, status: { $in: ['ACTIVE', 'published'] } });
+            if (isLinked || isPacked) {
+              skippedCount++;
+              return;
+            }
+
             if (item.storageKey) {
               await storageService.deleteObjectSafely(item.storageKey, item._id).catch(() => {});
             }
@@ -830,6 +839,22 @@ router.post('/content/bulk', authMiddleware, activeBotMiddleware, async (req, re
           }
         }));
       }
+
+      await ActivityLog.log(
+        `CONTENT_BULK_DELETE`,
+        req.admin.id,
+        'success',
+        { affectedCount, successCount, failedCount, skippedCount }
+      );
+
+      return res.json({
+        status: 'success',
+        affectedCount,
+        successCount,
+        failedCount,
+        skippedCount,
+        message: `Bulk delete completed: ${successCount} deleted successfully, ${skippedCount} skipped (used in active links/packs), ${failedCount} failed.`
+      });
     } else {
       let updateFields = {};
       if (action === 'enable') updateFields = { status: 'active' };
@@ -1219,6 +1244,24 @@ router.delete('/content/:id', authMiddleware, async (req, res, next) => {
     const content = await Content.findById(id);
     if (!content) {
       return res.status(404).json({ status: 'error', message: 'Content not found.' });
+    }
+
+    // Check if referenced by any active Link
+    const activeLink = await Link.findOne({ 'items.mediaId': id, status: 'active' });
+    if (activeLink) {
+      return res.status(400).json({
+        status: 'error',
+        message: `Cannot delete: This media is used in active link: ${activeLink.token}`
+      });
+    }
+
+    // Check if referenced by any active ContentPack
+    const activePack = await ContentPack.findOne({ 'items.contentId': id, status: { $in: ['ACTIVE', 'published'] } });
+    if (activePack) {
+      return res.status(400).json({
+        status: 'error',
+        message: `Cannot delete: This media is used in active content pack: ${activePack.name || activePack.publicCode}`
+      });
     }
 
     // 1. Remove from Filebase S3 if type uses storage

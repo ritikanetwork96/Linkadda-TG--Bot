@@ -1070,6 +1070,40 @@ export async function handleAdminCallback(ctx) {
           return ctx.reply('⚠️ Media file not found or already deleted.').catch(() => {});
         }
 
+        // Check active link references
+        const activeLink = await Link.findOne({ 'items.mediaId': media._id, status: 'active' });
+        if (activeLink) {
+          const warnText =
+            `⚠️ <b>Cannot Delete Media File</b>\n\n` +
+            `The file <code>${escapeHTML(media.originalFileName || media.title)}</code> is currently referenced by active Link: <b>${activeLink.token}</b>.\n\n` +
+            `Please deactivate or delete the link before deleting this media file.`;
+          return ctx.reply(warnText, {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '⬅️ Go Back', callback_data: `admin:med:list:${type}:${page}` }]
+              ]
+            }
+          }).catch(() => {});
+        }
+
+        // Check active pack references
+        const activePack = await ContentPack.findOne({ 'items.contentId': media._id, status: { $in: ['ACTIVE', 'published'] } });
+        if (activePack) {
+          const warnText =
+            `⚠️ <b>Cannot Delete Media File</b>\n\n` +
+            `The file <code>${escapeHTML(media.originalFileName || media.title)}</code> is currently referenced by active Content Pack: <b>${escapeHTML(activePack.name || activePack.publicCode)}</b>.\n\n` +
+            `Please unpublish or delete the pack before deleting this media file.`;
+          return ctx.reply(warnText, {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '⬅️ Go Back', callback_data: `admin:med:list:${type}:${page}` }]
+              ]
+            }
+          }).catch(() => {});
+        }
+
         const sizeMB = media.fileSize ? `${(media.fileSize / (1024 * 1024)).toFixed(2)} MB` : 'Unknown';
         const confirmText =
           `🗑️ <b>Delete Media File?</b>\n\n` +
@@ -1077,7 +1111,7 @@ export async function handleAdminCallback(ctx) {
           `<b>Type:</b> ${media.type}\n` +
           `<b>Size:</b> ${sizeMB}\n\n` +
           `⚠️ This will permanently delete this file from <b>MongoDB</b> and <b>Filebase S3</b>.\n` +
-          `Any links using this file may break. Are you sure?`;
+          `Are you sure?`;
 
         await ctx.reply(confirmText, {
           parse_mode: 'HTML',
@@ -1104,6 +1138,18 @@ export async function handleAdminCallback(ctx) {
           await ctx.reply('⚠️ File not found — it may have already been deleted.').catch(() => {});
           await renderMediaLibrary(ctx, type, page, false);
           return;
+        }
+
+        // Double check link reference
+        const activeLink = await Link.findOne({ 'items.mediaId': media._id, status: 'active' });
+        if (activeLink) {
+          return ctx.reply(`❌ Cannot delete. Referenced by active Link ${activeLink.token}`).catch(() => {});
+        }
+
+        // Double check pack reference
+        const activePack = await ContentPack.findOne({ 'items.contentId': media._id, status: { $in: ['ACTIVE', 'published'] } });
+        if (activePack) {
+          return ctx.reply(`❌ Cannot delete. Referenced by active Content Pack ${activePack.name || activePack.publicCode}`).catch(() => {});
         }
 
         let s3Deleted = false;
