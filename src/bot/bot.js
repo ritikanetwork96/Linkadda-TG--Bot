@@ -1,6 +1,7 @@
 import { Telegraf } from 'telegraf';
 import { config } from '../config/env.js';
 import { Setting } from '../models/Setting.js';
+import { Bot } from '../models/Bot.js';
 import { startHandler } from './handlers/start.handler.js';
 import { messageHandler } from './handlers/message.handler.js';
 import { callbackHandler } from './handlers/callback.handler.js';
@@ -17,13 +18,26 @@ if (!config.userBotToken) {
 export const bot = new Telegraf(config.userBotToken);
 export const userBot = bot; // alias for clarity
 
+// Cache for mapping telegramBotId (number) to MongoDB Bot ID (ObjectId)
+const botIdCache = new Map();
+
 // ── User Bot Middleware: fetch settings, check maintenance / enabled ───────
 bot.use(async (ctx, next) => {
   let nextCalled = false;
   try {
-    const { Bot } = await import('../models/Bot.js');
-    const botDoc = await Bot.findOne({ telegramBotId: ctx.botInfo?.id });
-    const botId = botDoc ? botDoc._id : null;
+    const telegramBotId = ctx.botInfo?.id;
+    let botId = null;
+    if (telegramBotId) {
+      if (botIdCache.has(telegramBotId)) {
+        botId = botIdCache.get(telegramBotId);
+      } else {
+        const botDoc = await Bot.findOne({ telegramBotId });
+        if (botDoc) {
+          botId = botDoc._id;
+          botIdCache.set(telegramBotId, botId);
+        }
+      }
+    }
 
     const settings = await Setting.getSettings(botId);
     ctx.state.botId = botId;

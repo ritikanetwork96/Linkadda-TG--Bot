@@ -94,8 +94,18 @@ const settingSchema = new mongoose.Schema(
   }
 );
 
-// Method to get settings or initialize with defaults if none exists
+let cachedSettingsMap = new Map();
+let cacheTimes = new Map();
+
+// Method to get settings or initialize with defaults if none exists (with 5-second TTL cache)
 settingSchema.statics.getSettings = async function (botId) {
+  const now = Date.now();
+  const botIdStr = botId ? botId.toString() : 'default';
+  
+  if (cachedSettingsMap.has(botIdStr) && (now - cacheTimes.get(botIdStr) < 5000)) {
+    return cachedSettingsMap.get(botIdStr);
+  }
+  
   let query = {};
   if (botId) {
     query.botId = botId;
@@ -104,7 +114,17 @@ settingSchema.statics.getSettings = async function (botId) {
   if (!settings) {
     settings = await this.create(query);
   }
+  
+  cachedSettingsMap.set(botIdStr, settings);
+  cacheTimes.set(botIdStr, now);
   return settings;
+};
+
+// Method to manually clear cache on settings update
+settingSchema.statics.clearCache = function (botId) {
+  const botIdStr = botId ? botId.toString() : 'default';
+  cachedSettingsMap.delete(botIdStr);
+  cacheTimes.delete(botIdStr);
 };
 
 export const Setting = mongoose.model('Setting', settingSchema);

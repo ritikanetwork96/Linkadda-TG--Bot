@@ -1362,6 +1362,7 @@ router.patch('/settings', authMiddleware, activeBotMiddleware, async (req, res, 
     }
 
     await settings.save();
+    Setting.clearCache(req.botId);
 
     await ActivityLog.log('Settings changed', adminId, 'success', req.body);
 
