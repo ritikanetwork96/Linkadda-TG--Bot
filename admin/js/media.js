@@ -53,7 +53,6 @@ function renderMediaGallery(items) {
   }
 
   container.innerHTML = items.map(item => {
-    // Generate S3 URL if storageKey exists, otherwise fallback to telegram url or placeholder
     const mediaUrl = item.downloadUrl || (item.storageKey ? `https://${getCleanBucketName(item.storageBucket)}.s3.filebase.com/${item.storageKey}` : '');
     
     let thumbHtml = '';
@@ -71,7 +70,7 @@ function renderMediaGallery(items) {
     const sizeStr = item.fileSize ? (item.fileSize / 1024 / 1024).toFixed(1) + ' MB' : '';
 
     return `
-      <div class="media-card">
+      <div class="media-card" data-id="${item._id}" data-title="${item.title}">
         <div class="media-thumbnail">
           ${thumbHtml}
         </div>
@@ -84,13 +83,14 @@ function renderMediaGallery(items) {
           <div class="media-actions">
             ${mediaUrl ? `<a href="${mediaUrl}" target="_blank" class="btn btn-outline" style="text-decoration:none; text-align:center;">Preview</a>` : ''}
             <button class="btn btn-outline btn-copy-link" data-url="${mediaUrl}">Copy URL</button>
+            <button class="btn btn-delete-media" data-id="${item._id}" data-title="${item.title}">🗑️ Delete</button>
           </div>
         </div>
       </div>
     `;
   }).join('');
 
-  // Bind copy events
+  // Bind copy URL events
   container.querySelectorAll('.btn-copy-link').forEach(btn => {
     btn.addEventListener('click', () => {
       const url = btn.getAttribute('data-url');
@@ -98,6 +98,40 @@ function renderMediaGallery(items) {
       navigator.clipboard.writeText(url).then(() => {
         Toast.show('Media URL copied!', 'success');
       });
+    });
+  });
+
+  // Bind delete events
+  container.querySelectorAll('.btn-delete-media').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id');
+      const title = btn.getAttribute('data-title') || 'this file';
+
+      if (!confirm(`⚠️ Delete "${title}" permanently?\n\nThis will remove it from MongoDB AND Filebase S3 storage. Any links using this file may break.`)) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Deleting...';
+
+      try {
+        const res = await API.delete(`/content/${id}`);
+        if (res.status === 'success') {
+          Toast.show(`🗑️ "${title}" deleted successfully.`, 'success');
+          // Smooth fade-out before DOM removal
+          const card = container.querySelector(`.media-card[data-id="${id}"]`);
+          if (card) {
+            card.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+            card.style.opacity = '0';
+            card.style.transform = 'scale(0.9)';
+            setTimeout(() => card.remove(), 320);
+          }
+        } else {
+          throw new Error(res.message || 'Delete failed');
+        }
+      } catch (err) {
+        Toast.show(`❌ Delete failed: ${err.message}`, 'error');
+        btn.disabled = false;
+        btn.textContent = '🗑️ Delete';
+      }
     });
   });
 }
