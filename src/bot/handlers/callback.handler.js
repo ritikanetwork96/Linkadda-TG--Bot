@@ -234,9 +234,7 @@ export async function callbackHandler(ctx) {
 
       // Dispatch tracking and delivery parameters using V1 services
       const batchId = `batch_${crypto.randomUUID()}_requested`;
-      const deleteAt = settings.autoDeleteEnabled
-        ? new Date(Date.now() + settings.autoDeleteHours * 60 * 60 * 1000)
-        : null;
+      const deleteAt = null;
 
       try {
         await telegramService.deliverContent(user._id, chatId, content, batchId, deleteAt, ctx.state.botId);

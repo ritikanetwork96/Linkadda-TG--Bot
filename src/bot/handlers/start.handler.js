@@ -138,8 +138,6 @@ export async function startHandler(ctx) {
           let deleteAt = null;
           if (link.autoDeleteSeconds !== undefined && link.autoDeleteSeconds !== null) {
             deleteAt = new Date(Date.now() + link.autoDeleteSeconds * 1000);
-          } else if (settings.autoDeleteEnabled) {
-            deleteAt = new Date(Date.now() + settings.autoDeleteHours * 60 * 60 * 1000);
           }
 
           // Sort items by sortOrder
@@ -272,12 +270,6 @@ export async function startHandler(ctx) {
         try {
           const batchId = batch._id.toString();
           let deleteAt = pack.expiresAt || null;
-          if (settings.autoDeleteEnabled) {
-            const globalDeleteAt = new Date(Date.now() + settings.autoDeleteHours * 60 * 60 * 1000);
-            if (!deleteAt || globalDeleteAt < deleteAt) {
-              deleteAt = globalDeleteAt;
-            }
-          }
 
           const results = await telegramService.deliverContentPack(user._id, chatId, pack, batchId, deleteAt, botId);
 
@@ -372,9 +364,7 @@ export async function startHandler(ctx) {
       const startContents = await contentService.getStartContents(settings.startContentLimit, botId);
       if (startContents && startContents.length > 0) {
         const batchId = new mongoose.Types.ObjectId().toString();
-        const deleteAt = settings.autoDeleteEnabled
-          ? new Date(Date.now() + settings.autoDeleteHours * 60 * 60 * 1000)
-          : null;
+        const deleteAt = null;
 
         for (const content of startContents) {
           try {
