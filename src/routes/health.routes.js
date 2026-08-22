@@ -120,6 +120,14 @@ router.get('/api/debug-db', async (req, res) => {
     const lastLinks = await Link.find().sort({ createdAt: -1 }).limit(5).lean();
     const lastContents = await Content.find().sort({ createdAt: -1 }).limit(5).lean();
     
+    let gitCommit = 'unknown';
+    try {
+      const { execSync } = await import('child_process');
+      gitCommit = execSync('git log -n 1 --oneline').toString().trim();
+    } catch (gitErr) {
+      gitCommit = `error: ${gitErr.message}`;
+    }
+    
     return res.json({
       status: 'success',
       database: {
@@ -131,6 +139,7 @@ router.get('/api/debug-db', async (req, res) => {
         links: totalLinks,
         contents: totalContent
       },
+      gitCommit,
       lastLinks,
       lastContents
     });
