@@ -7,6 +7,7 @@ import { Admin } from './models/Admin.js';
 import { Setting } from './models/Setting.js';
 import { startDeletionScheduler, stopDeletionScheduler } from './scheduler/deletion.scheduler.js';
 import { startExpiryScheduler, stopExpiryScheduler } from './scheduler/expiry.scheduler.js';
+import { startKeepAliveScheduler, stopKeepAliveScheduler } from './scheduler/keepalive.scheduler.js';
 import { hashPassword, decrypt } from './config/crypto.js';
 import mongoose from 'mongoose';
 
@@ -146,6 +147,9 @@ async function bootstrap() {
     // Start the automatic expiry scheduler
     startExpiryScheduler();
 
+    // Start the keep-alive scheduler
+    startKeepAliveScheduler();
+
     // 11. Start the scheduled broadcast cron worker
     const { startBroadcastScheduler } = await import('./scheduler/broadcast.scheduler.js');
     startBroadcastScheduler();
@@ -173,6 +177,7 @@ async function handleShutdown(signal) {
   // Stop scheduler
   stopDeletionScheduler();
   stopExpiryScheduler();
+  stopKeepAliveScheduler();
   try {
     const { stopBroadcastScheduler } = await import('./scheduler/broadcast.scheduler.js');
     stopBroadcastScheduler();
