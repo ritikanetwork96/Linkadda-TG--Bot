@@ -409,51 +409,46 @@ router.post('/auth/reset-password', async (req, res, next) => {
 
 router.get('/dashboard', authMiddleware, activeBotMiddleware, async (req, res, next) => {
   try {
-    syncS3ToDatabase(req.botId);
+    syncS3ToDatabase(req.botId); // fire-and-forget S3 sync (non-blocking)
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // Strict bot-scoped queries — no null fallback to avoid cross-bot data leaks
     const userQuery = req.botId ? { botId: req.botId } : {};
     const contentQuery = req.botId ? { botId: req.botId } : {};
 
-    const totalUsers = await User.countDocuments(userQuery);
-    const activeUsers = await User.countDocuments({ ...userQuery, status: 'active' });
-    const usersToday = await User.countDocuments({ ...userQuery, createdAt: { $gte: startOfToday } });
-    
-    const totalCategories = await Category.countDocuments(contentQuery);
-    const totalContent = await Content.countDocuments(contentQuery);
-    const activeContent = await Content.countDocuments({ ...contentQuery, status: 'active' });
-    const startContentCount = await Content.countDocuments({ ...contentQuery, isStartContent: true, status: 'active' });
-    const pendingDeletions = await Delivery.countDocuments({ ...contentQuery, status: 'sent', deleteAt: { $gt: now } });
-
-    // Aggregate counts by type
-    const contentByType = await Content.aggregate([
-      { $match: contentQuery },
-      { $group: { _id: '$type', count: { $sum: 1 } } }
+    // Run all DB count queries in parallel — saves ~7 sequential round-trips
+    const [
+      totalUsers,
+      activeUsers,
+      usersToday,
+      totalCategories,
+      totalContent,
+      activeContent,
+      startContentCount,
+      pendingDeletions,
+      contentByType,
+      recentContent,
+      recentUsers,
+      recentActivity
+    ] = await Promise.all([
+      User.countDocuments(userQuery),
+      User.countDocuments({ ...userQuery, status: 'active' }),
+      User.countDocuments({ ...userQuery, createdAt: { $gte: startOfToday } }),
+      Category.countDocuments(contentQuery),
+      Content.countDocuments(contentQuery),
+      Content.countDocuments({ ...contentQuery, status: 'active' }),
+      Content.countDocuments({ ...contentQuery, isStartContent: true, status: 'active' }),
+      Delivery.countDocuments({ status: 'sent', deleteAt: { $gt: now } }),
+      Content.aggregate([{ $match: contentQuery }, { $group: { _id: '$type', count: { $sum: 1 } } }]),
+      Content.find(contentQuery).sort({ createdAt: -1 }).limit(5).lean(),
+      User.find(userQuery).sort({ createdAt: -1 }).limit(5).lean(),
+      ActivityLog.find().populate('adminId', 'name email').sort({ timestamp: -1 }).limit(10)
     ]);
+
     const typeStats = contentByType.reduce((acc, curr) => {
       acc[curr._id] = curr.count;
       return acc;
     }, { video: 0, photo: 0, document: 0, link: 0, text: 0 });
-
-    // Recent Content
-    const recentContent = await Content.find(contentQuery)
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .lean();
-
-    // Recent Users
-    const recentUsers = await User.find(userQuery)
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .lean();
-
-    // Recent Activity
-    const recentActivity = await ActivityLog.find() // ActivityLog typically lacks botId, leaving as is unless added
-      .populate('adminId', 'name email')
-      .sort({ timestamp: -1 })
-      .limit(10);
 
     return res.json({
       status: 'success',
@@ -927,17 +922,17 @@ router.get('/content', authMiddleware, activeBotMiddleware, async (req, res, nex
       .skip((page - 1) * limit)
       .limit(limit);
 
-    const mappedContent = await Promise.all(content.map(async (c) => {
+    // Build public CDN URLs — no presigned URL needed (Filebase public bucket)
+    // Eliminates N sequential S3 HTTP calls per page load
+    const mappedContent = content.map((c) => {
       const obj = c.toObject();
       if (obj.storageKey) {
-        try {
-          obj.downloadUrl = await storageService.generatePresignedDownloadUrl(obj.storageKey, 86400);
-        } catch (err) {
-          console.error(`S3 Service: Failed to sign preview for key ${obj.storageKey}:`, err.message);
-        }
+        // Direct Filebase public URL — instant, no S3 round-trip
+        const bucketName = (obj.storageBucket || '').replace(/^https?:\/\//i, '').split('.')[0] || 'linkadda-bot';
+        obj.downloadUrl = `https://${bucketName}.s3.filebase.com/${obj.storageKey}`;
       }
       return obj;
-    }));
+    });
 
     return res.json({
       status: 'success',
