@@ -4038,7 +4038,8 @@ async function handleAdminMessageInternal(ctx) {
             caption: type !== 'text' ? caption : '',
             sortOrder: freshSession.linkDraft.items.length,
             captionEntities: type !== 'text' ? captionEntities : undefined,
-            textEntities: type === 'text' ? textEntities : undefined
+            textEntities: type === 'text' ? textEntities : undefined,
+            mediaGroupId: mediaGroupId || undefined
           };
 
           freshSession.linkDraft.items.push(newItem);

@@ -146,6 +146,7 @@ export async function startHandler(ctx) {
           // Group consecutive photo/video items into media groups (like deliverContentPack)
           const groupableTypes = ['photo', 'video'];
           let mediaQueue = []; // { resolvedContent, captionOverride }
+          let currentGroupId = null; // Track current media group ID
           let itemsSent = 0;
 
           const flushMediaQueue = async () => {
@@ -161,8 +162,10 @@ export async function startHandler(ctx) {
                 for (let i = 0; i < mediaQueue.length; i += 10) {
                   const chunk = mediaQueue.slice(i, i + 10);
                   try {
+                    console.log(`[MEDIA_GROUP] linkToken=${link.token} mediaGroupId=${currentGroupId} items=${chunk.length} action=sendMediaGroup`);
                     await telegramService.deliverMediaGroup(user._id, chatId, chunk, batchId, deleteAt, botId);
                     itemsSent += chunk.length;
+                    console.log(`[MEDIA_GROUP] mediaGroupId=${currentGroupId} items=${chunk.length} status=sent`);
                   } catch (mediaGroupErr) {
                     console.error(`flushMediaQueue: Failed to deliver media group chunk, retrying individually: ${mediaGroupErr.message}`);
                     // Fallback: If group delivery fails, send each item in the chunk individually
@@ -182,6 +185,7 @@ export async function startHandler(ctx) {
               console.error(`flushMediaQueue: Queue processing failed: ${queueErr.message}`);
             }
             mediaQueue = [];
+            currentGroupId = null;
           };
 
           for (const item of items) {
@@ -201,8 +205,32 @@ export async function startHandler(ctx) {
                 if (media) {
                   const captionOverride = item.caption !== undefined ? item.caption : null;
                   if (groupableTypes.includes(media.type)) {
-                    mediaQueue.push({ resolvedContent: media.toObject(), captionOverride });
+                    const itemGroupId = item.mediaGroupId;
+                    
+                    if (itemGroupId) {
+                      if (currentGroupId === null) {
+                        currentGroupId = itemGroupId;
+                        mediaQueue.push({ resolvedContent: media.toObject(), captionOverride });
+                      } else if (currentGroupId === itemGroupId) {
+                        mediaQueue.push({ resolvedContent: media.toObject(), captionOverride });
+                      } else {
+                        await flushMediaQueue();
+                        currentGroupId = itemGroupId;
+                        mediaQueue.push({ resolvedContent: media.toObject(), captionOverride });
+                      }
+                    } else {
+                      // Standalone photo/video item (no mediaGroupId)
+                      await flushMediaQueue();
+                      const deliveryContent = {
+                        ...media.toObject(),
+                        caption: item.caption ?? media.caption ?? '',
+                        captionEntities: (item.captionEntities && item.captionEntities.length > 0) ? item.captionEntities : (media.captionEntities || [])
+                      };
+                      await telegramService.deliverContent(user._id, chatId, deliveryContent, batchId, deleteAt, botId);
+                      itemsSent++;
+                    }
                   } else {
+                    // Document or other type -> flush media group first
                     await flushMediaQueue();
                     const deliveryContent = {
                       ...media.toObject(),
