@@ -194,6 +194,7 @@ export const telegramService = {
       mediaList.push(mediaItem);
     }
 
+    const sendOptions = {};
     const isAdmin = config.adminTelegramIds.map(String).includes(String(chatId));
     if (!isAdmin || options.protectContent) {
       sendOptions.protect_content = true;
