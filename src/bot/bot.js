@@ -60,11 +60,9 @@ bot.use(async (ctx, next) => {
       if (botIdCache.has(telegramBotId)) {
         botId = botIdCache.get(telegramBotId);
       } else {
-        const botDoc = await Bot.findOne({ telegramBotId });
-        if (botDoc) {
-          botId = botDoc._id;
-          botIdCache.set(telegramBotId, botId);
-        }
+        const botDoc = await Bot.findOne({ telegramBotId }).select('_id').lean();
+        botId = botDoc ? botDoc._id : null;
+        botIdCache.set(telegramBotId, botId);
       }
     }
 

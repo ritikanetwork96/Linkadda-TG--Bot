@@ -188,6 +188,12 @@ export async function startHandler(ctx) {
             currentGroupId = null;
           };
 
+          // Pre-fetch all media content items to avoid N+1 queries in the loop
+          const mediaIds = items.filter(item => item.mediaId).map(item => item.mediaId);
+          const { Content } = await import('../../models/Content.js');
+          const mediaItems = mediaIds.length > 0 ? await Content.find({ _id: { $in: mediaIds } }).lean() : [];
+          const mediaMap = new Map(mediaItems.map(m => [m._id.toString(), m]));
+
           for (const item of items) {
             try {
               if (item.type === 'text') {
@@ -200,29 +206,29 @@ export async function startHandler(ctx) {
                 await telegramService.deliverContent(user._id, chatId, textContent, batchId, deleteAt, botId);
                 itemsSent++;
               } else if (item.mediaId) {
-                const { Content } = await import('../../models/Content.js');
-                const media = await Content.findById(item.mediaId);
+                const media = mediaMap.get(item.mediaId.toString());
                 if (media) {
                   const captionOverride = item.caption !== undefined ? item.caption : null;
                   if (groupableTypes.includes(media.type)) {
                     const itemGroupId = item.mediaGroupId;
                     
                     if (itemGroupId) {
+                      const captionEntities = (item.captionEntities && item.captionEntities.length > 0) ? item.captionEntities : (media.captionEntities || []);
                       if (currentGroupId === null) {
                         currentGroupId = itemGroupId;
-                        mediaQueue.push({ resolvedContent: media.toObject(), captionOverride });
+                        mediaQueue.push({ resolvedContent: media, captionOverride, captionEntities });
                       } else if (currentGroupId === itemGroupId) {
-                        mediaQueue.push({ resolvedContent: media.toObject(), captionOverride });
+                        mediaQueue.push({ resolvedContent: media, captionOverride, captionEntities });
                       } else {
                         await flushMediaQueue();
                         currentGroupId = itemGroupId;
-                        mediaQueue.push({ resolvedContent: media.toObject(), captionOverride });
+                        mediaQueue.push({ resolvedContent: media, captionOverride, captionEntities });
                       }
                     } else {
                       // Standalone photo/video item (no mediaGroupId)
                       await flushMediaQueue();
                       const deliveryContent = {
-                        ...media.toObject(),
+                        ...media,
                         caption: item.caption ?? media.caption ?? '',
                         captionEntities: (item.captionEntities && item.captionEntities.length > 0) ? item.captionEntities : (media.captionEntities || [])
                       };
@@ -233,7 +239,7 @@ export async function startHandler(ctx) {
                     // Document or other type -> flush media group first
                     await flushMediaQueue();
                     const deliveryContent = {
-                      ...media.toObject(),
+                      ...media,
                       caption: item.caption ?? media.caption ?? '',
                       captionEntities: (item.captionEntities && item.captionEntities.length > 0) ? item.captionEntities : (media.captionEntities || [])
                     };

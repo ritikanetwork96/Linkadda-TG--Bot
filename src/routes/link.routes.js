@@ -100,6 +100,11 @@ router.get('/l/:token', async (req, res, next) => {
     // Sort items by sortOrder
     const items = [...link.items].sort((a, b) => a.sortOrder - b.sortOrder);
 
+    // Pre-fetch all media content items to avoid N+1 queries in the loop
+    const mediaIds = items.filter(item => item.mediaId).map(item => item.mediaId);
+    const mediaItems = mediaIds.length > 0 ? await Content.find({ _id: { $in: mediaIds } }).lean() : [];
+    const mediaMap = new Map(mediaItems.map(m => [m._id.toString(), m]));
+
     for (const item of items) {
       if (item.type === 'text') {
         renderedItems.push({
@@ -107,7 +112,7 @@ router.get('/l/:token', async (req, res, next) => {
           text: item.text
         });
       } else if (item.mediaId) {
-        const media = await Content.findById(item.mediaId);
+        const media = mediaMap.get(item.mediaId.toString());
         if (media && media.storageKey) {
           // Generate short-lived presigned URL (15 minutes = 900 seconds)
           const presignedUrl = await storageService.generatePresignedDownloadUrl(media.storageKey, 900);

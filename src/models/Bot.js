@@ -20,7 +20,7 @@ const botSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['connected', 'disconnected', 'error'],
+      enum: ['connected', 'disconnected', 'error', 'active'],
       default: 'disconnected',
       index: true,
     },

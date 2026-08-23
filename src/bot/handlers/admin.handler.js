@@ -778,32 +778,37 @@ export async function handleAdminCallback(ctx) {
             let success = 0;
             let failed = 0;
 
+            // Pre-resolve all media/text items once to avoid N+1 queries/creation inside the user loop
+            const resolvedItems = [];
+            for (const item of items) {
+              if (item.type === 'text') {
+                const textDoc = await Content.create({
+                  title: 'Direct Text Post',
+                  type: 'text',
+                  text: item.text,
+                  status: 'active',
+                  botId: ctx.state.botId
+                });
+                resolvedItems.push(textDoc);
+              } else {
+                const mediaDoc = await Content.findById(item.mediaId);
+                if (mediaDoc) {
+                  resolvedItems.push(mediaDoc);
+                }
+              }
+            }
+
             for (const userObj of activeUsers) {
               try {
-                for (const item of items) {
-                  let contentDoc = null;
-                  if (item.type === 'text') {
-                    contentDoc = await Content.create({
-                      title: 'Direct Text Post',
-                      type: 'text',
-                      text: item.text,
-                      status: 'active',
-                      botId: ctx.state.botId
-                    });
-                  } else {
-                    contentDoc = await Content.findById(item.mediaId);
-                  }
-
-                  if (contentDoc) {
-                    await telegramService.deliverContent(
-                      userObj._id,
-                      userObj.telegramUserId,
-                      contentDoc,
-                      broadcastBatchId,
-                      deleteAt,
-                      ctx.state.botId
-                    );
-                  }
+                for (const contentDoc of resolvedItems) {
+                  await telegramService.deliverContent(
+                    userObj._id,
+                    userObj.telegramUserId,
+                    contentDoc,
+                    broadcastBatchId,
+                    deleteAt,
+                    ctx.state.botId
+                  );
                 }
                 success++;
               } catch (err) {
@@ -929,6 +934,11 @@ export async function handleAdminCallback(ctx) {
 
         const items = [...link.items].sort((a, b) => a.sortOrder - b.sortOrder);
         
+        // Pre-fetch all media content items to avoid N+1 queries in the loop
+        const mediaIds = items.filter(item => item.mediaId).map(item => item.mediaId);
+        const mediaItems = mediaIds.length > 0 ? await Content.find({ _id: { $in: mediaIds } }).lean() : [];
+        const mediaMap = new Map(mediaItems.map(m => [m._id.toString(), m]));
+
         for (const item of items) {
           try {
             if (item.type === 'text') {
@@ -936,7 +946,7 @@ export async function handleAdminCallback(ctx) {
                 entities: item.textEntities
               }).catch(() => {});
             } else if (item.mediaId) {
-              const media = await Content.findById(item.mediaId);
+              const media = mediaMap.get(item.mediaId.toString());
               if (media) {
                 const caption = item.caption || media.caption || '';
                 const entities = (item.captionEntities && item.captionEntities.length > 0) ? item.captionEntities : (media.captionEntities || []);
@@ -1380,8 +1390,12 @@ export async function handleAdminCallback(ctx) {
           let progressMsg = null;
           try {
             global.pendingUploads = global.pendingUploads || {};
+            const contentIds = pack.items.map(item => item.contentId);
+            const contentItems = await Content.find({ _id: { $in: contentIds } }).lean();
+            const contentMap = new Map(contentItems.map(c => [c._id.toString(), c]));
+
             for (const item of pack.items) {
-              const contentItem = await Content.findById(item.contentId);
+              const contentItem = contentMap.get(item.contentId.toString());
               if (contentItem && contentItem.storageKey && global.pendingUploads[contentItem.storageKey]) {
                 if (!progressMsg) {
                   progressMsg = await ctx.reply('⏳ Completing S3 media uploads... Please wait.').catch(() => {});

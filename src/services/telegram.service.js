@@ -62,7 +62,7 @@ export const telegramService = {
       const isOverride = options.captionOverride !== undefined && options.captionOverride !== null;
       if (!isOverride && content.captionEntities && content.captionEntities.length > 0) {
         sendOptions.caption_entities = content.captionEntities;
-      } else {
+      } else if (/<[a-z/][^>]*>/i.test(finalCaption)) {
         sendOptions.parse_mode = 'HTML';
       }
     }
@@ -187,7 +187,9 @@ export const telegramService = {
         const isOverride = item.captionOverride !== undefined && item.captionOverride !== null;
         if (!isOverride && content.captionEntities && content.captionEntities.length > 0) {
           mediaItem.caption_entities = content.captionEntities;
-        } else {
+        } else if (item.captionEntities && item.captionEntities.length > 0) {
+          mediaItem.caption_entities = item.captionEntities;
+        } else if (/<[a-z/][^>]*>/i.test(caption)) {
           mediaItem.parse_mode = 'HTML';
         }
       }
@@ -291,9 +293,14 @@ export const telegramService = {
       mediaGroupQueue = [];
     };
 
+    // Pre-fetch all content items to avoid N+1 queries in the loop
+    const contentIds = items.map(item => item.contentId);
+    const contentList = contentIds.length > 0 ? await Content.find({ _id: { $in: contentIds }, status: 'active' }).lean() : [];
+    const contentMap = new Map(contentList.map(c => [c._id.toString(), c]));
+
     for (const item of items) {
       // Resolve content item from DB
-      const content = await Content.findOne({ _id: item.contentId, status: 'active' });
+      const content = contentMap.get(item.contentId.toString());
       if (!content) {
         results.skipped++;
         continue;

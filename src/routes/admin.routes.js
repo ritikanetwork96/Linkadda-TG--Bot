@@ -69,38 +69,40 @@ const syncS3ToDatabase = async (botId) => {
       }
 
       console.log(`S3-to-DB Sync: Found ${s3Objects.length} objects. Syncing missing items...`);
+      const existingContents = await Content.find({ storageKey: { $regex: '^tg_forwarded_' } }).select('storageKey').lean();
+      const existingKeysSet = new Set(existingContents.map(c => c.storageKey));
+
       for (const obj of s3Objects) {
         const key = obj.Key;
-        const exists = await Content.findOne({ storageKey: key });
-        if (!exists) {
-          let type = 'photo';
-          let mimeType = 'image/jpeg';
-          try {
-            const meta = await storageService.headObject(key);
-            mimeType = meta.ContentType || 'image/jpeg';
-            if (mimeType.includes('video')) {
-              type = 'video';
-            } else if (mimeType.includes('document')) {
-              type = 'document';
-            }
-          } catch (e) {
-            console.error(`S3-to-DB Sync: Failed to fetch metadata for key ${key}:`, e.message);
+        if (existingKeysSet.has(key)) continue;
+
+        let type = 'photo';
+        let mimeType = 'image/jpeg';
+        try {
+          const meta = await storageService.headObject(key);
+          mimeType = meta.ContentType || 'image/jpeg';
+          if (mimeType.includes('video')) {
+            type = 'video';
+          } else if (mimeType.includes('document')) {
+            type = 'document';
           }
-
-          const IndiaTime = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' });
-
-          await Content.create({
-            botId,
-            title: `Forwarded ${type.charAt(0).toUpperCase() + type.slice(1)}`,
-            type,
-            storageKey: key,
-            telegramFileUniqueId: key.replace('tg_forwarded_', ''),
-            status: 'active',
-            mimeType,
-            fileSize: obj.Size || 0
-          });
-          console.log(`S3-to-DB Sync: Imported key "${key}" as "${type}"`);
+        } catch (e) {
+          console.error(`S3-to-DB Sync: Failed to fetch metadata for key ${key}:`, e.message);
         }
+
+        const IndiaTime = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+        await Content.create({
+          botId,
+          title: `Forwarded ${type.charAt(0).toUpperCase() + type.slice(1)}`,
+          type,
+          storageKey: key,
+          telegramFileUniqueId: key.replace('tg_forwarded_', ''),
+          status: 'active',
+          mimeType,
+          fileSize: obj.Size || 0
+        });
+        console.log(`S3-to-DB Sync: Imported key "${key}" as "${type}"`);
       }
       console.log('S3-to-DB Sync: Finished.');
     } catch (err) {
@@ -141,7 +143,7 @@ const activeBotMiddleware = async (req, res, next) => {
     }
     
     // Fall back to active bot in DB
-    const activeBot = await BotModel.findOne({ status: 'connected' });
+    const activeBot = await BotModel.findOne({ status: { $in: ['active', 'connected'] } });
     if (activeBot) {
       req.botId = activeBot._id;
     }
