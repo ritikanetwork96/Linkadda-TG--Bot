@@ -131,6 +131,11 @@ app.use(cookieParser());
 // 5. Serve Admin Static Panel
 app.use('/admin', express.static(path.resolve(__dirname, '../admin')));
 
+// 5b. Redirect root '/' to '/admin/' for seamless access
+app.get('/', (req, res) => {
+  return res.redirect('/admin/');
+});
+
 // 6. Routes
 app.use('/', healthRoutes);
 app.use('/', linkRoutes);
