@@ -91,10 +91,24 @@ async function bootstrap() {
     }
 
     // 5. Load Active Bot Token from Database if configured
-    const activeDbBot = await BotModel.findOne({ 
+    let activeDbBot = await BotModel.findOne({ 
       status: { $in: ['connected', 'active'] }, 
       encryptedToken: { $exists: true, $ne: '' } 
-    });
+    }).sort({ updatedAt: -1 });
+
+    if (!activeDbBot) {
+      activeDbBot = await BotModel.findOne({ 
+        encryptedToken: { $exists: true, $ne: '' } 
+      }).sort({ updatedAt: -1 });
+    }
+
+    if (activeDbBot) {
+      // Ensure only this bot is connected
+      await BotModel.updateMany({ _id: { $ne: activeDbBot._id } }, { $set: { status: 'disconnected' } });
+      activeDbBot.status = 'connected';
+      await activeDbBot.save();
+    }
+
     let activeToken = config.userBotToken;
     if (activeDbBot && activeDbBot.encryptedToken) {
       try {
@@ -119,7 +133,7 @@ async function bootstrap() {
       const userBotInfo = await bot.telegram.getMe();
       console.log(`Bootstrap: User Bot authenticated as @${userBotInfo.username} (ID: ${userBotInfo.id})`);
 
-      // 7. Save User Bot info in MongoDB
+      // 7. Save User Bot info in MongoDB and ensure only this bot is marked connected
       await BotModel.findOneAndUpdate(
         { telegramBotId: userBotInfo.id },
         {
@@ -129,7 +143,11 @@ async function bootstrap() {
         },
         { upsert: true, new: true }
       );
-      console.log('Bootstrap: User Bot metadata synchronized with MongoDB.');
+      await BotModel.updateMany(
+        { telegramBotId: { $ne: userBotInfo.id } },
+        { $set: { status: 'disconnected' } }
+      );
+      console.log('Bootstrap: User Bot metadata synchronized with MongoDB (Active: @' + userBotInfo.username + ').');
 
       // 7b. Automatically link any unlinked or previous bot assets (Categories, Media, Links) to this active bot
       try {

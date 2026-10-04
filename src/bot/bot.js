@@ -505,11 +505,13 @@ export async function reinitializeBot(newToken) {
   const { telegramService } = await import('../services/telegram.service.js');
   bot.telegram.token = newToken;
   telegramService.client.token = newToken;
+  bot.botInfo = undefined;
 
   console.log('TelegramBotManager: Relaunching User Bot manager with new token...');
   await userBotManager.start();
 
-  // Try to get new identity
+  // Try to get new identity and cache on bot instance
   const botInfo = await bot.telegram.getMe();
+  bot.botInfo = botInfo;
   return botInfo;
 }

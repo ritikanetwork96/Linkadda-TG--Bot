@@ -95,7 +95,7 @@ export async function migrateBotData(fromBotId, toBotId, options = {}) {
   // caches the new bot's own file_id, and avoids Telegram 400 Bad Request error.
   try {
     const contentResult = await Content.updateMany(
-      { botId: sourceBotQuery },
+      { $or: [{ botId: sourceBotQuery }, { botId: targetObjectId }] },
       {
         $set: {
           botId: targetObjectId,

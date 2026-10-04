@@ -2180,15 +2180,25 @@ router.get('/system/info', authMiddleware, async (req, res, next) => {
 
 router.get('/bots', authMiddleware, async (req, res, next) => {
   try {
-    const bots = await BotModel.find({}).select('-encryptedToken');
-    const mappedBots = bots.map(b => ({
-      _id: b._id,
-      telegramBotId: b.telegramBotId,
-      username: b.username,
-      displayName: b.firstName,
-      status: b.status,
-      createdAt: b.createdAt
-    }));
+    const bots = await BotModel.find({}).sort({ updatedAt: -1 }).select('-encryptedToken');
+    let connectedFound = false;
+    const mappedBots = bots.map(b => {
+      let isConn = false;
+      if (b.status === 'connected') {
+        if (!connectedFound) {
+          connectedFound = true;
+          isConn = true;
+        }
+      }
+      return {
+        _id: b._id,
+        telegramBotId: b.telegramBotId,
+        username: b.username,
+        displayName: b.firstName,
+        status: isConn ? 'connected' : (b.status === 'error' ? 'error' : 'disconnected'),
+        createdAt: b.createdAt
+      };
+    });
     res.json({ status: 'success', bots: mappedBots });
   } catch (err) {
     next(err);
@@ -2265,7 +2275,10 @@ router.post('/bots/:id/test', authMiddleware, async (req, res, next) => {
 
     botDoc.telegramBotId = botInfo.id;
     botDoc.username = botInfo.username;
-    botDoc.status = 'connected';
+    // If it was error, clear error state back to disconnected
+    if (botDoc.status === 'error') {
+      botDoc.status = 'disconnected';
+    }
     await botDoc.save();
 
     res.json({
@@ -2345,10 +2358,35 @@ router.post('/bots/:id/migrate-data', authMiddleware, async (req, res, next) => 
 
     const migrationStats = await migrateBotData(fromBotId, targetBotId, { adminId: req.admin.id });
 
+    // Automatically activate target bot so the transferred bot immediately starts listening and serving requests
+    await BotModel.updateMany({ _id: { $ne: targetBot._id } }, { $set: { status: 'disconnected' } });
+
+    let botInfo = null;
+    if (targetBot.encryptedToken) {
+      try {
+        const decryptedToken = decrypt(targetBot.encryptedToken);
+        botInfo = await reinitializeBot(decryptedToken);
+        targetBot.telegramBotId = botInfo.id;
+        targetBot.username = botInfo.username;
+      } catch (swapErr) {
+        console.error('Migrate-data: hot-swap bot listener error:', swapErr.message);
+      }
+    }
+
+    targetBot.status = 'connected';
+    await targetBot.save();
+
+    await ActivityLog.log('Bot Data Transferred & Activated', req.admin.id, 'success', {
+      targetBotId,
+      username: targetBot.username,
+      migrated: migrationStats
+    });
+
     return res.json({
       status: 'success',
-      message: `All platform data transferred to @${targetBot.username} successfully.`,
-      migrationStats
+      message: `All platform data transferred and @${targetBot.username} activated as active listener successfully.`,
+      migrationStats,
+      botInfo
     });
   } catch (err) {
     next(err);

@@ -118,14 +118,38 @@ export async function startHandler(ctx) {
         return; // STOP! Bypasses all other content delivery
       }
 
-      // 0b. Link Router (supports l_ format for deep links created from admin bot)
-      if (payload.startsWith('l_')) {
-        const token = payload.substring(2);
+      // 0b. Link Router (supports l_ format, direct L_ format, and numeric tokens)
+      const isLinkPayload = payload.startsWith('l_') || 
+                            payload.startsWith('L_') || 
+                            /^l_\d+$/i.test(payload) || 
+                            /^L_\d+$/i.test(payload) || 
+                            /^\d+$/.test(payload);
+      if (isLinkPayload) {
+        let token = payload;
+        if (payload.startsWith('l_L_') || payload.startsWith('l_l_')) {
+          token = payload.substring(2); // 'L_27'
+        } else if (payload.startsWith('l_') || payload.startsWith('L_')) {
+          token = payload.substring(2);
+        }
+
         try {
           const { Link } = await import('../../models/Link.js');
-          const link = await Link.findOne({ token });
+          const cleanNum = payload.replace(/\D/g, '');
+          const candidates = [
+            token,
+            payload,
+            `L_${token.replace(/^L_/i, '')}`,
+            `l_${token}`,
+            cleanNum ? `L_${cleanNum}` : null,
+            cleanNum ? cleanNum : null
+          ].filter(Boolean);
+
+          const link = await Link.findOne({
+            $or: candidates.map(t => ({ token: t }))
+          });
 
           if (!link) {
+            console.warn(`Start Handler: Link not found for payload "${payload}". Candidates tried:`, candidates);
             return ctx.reply('❌ This link is no longer available.').catch(() => {});
           }
 
