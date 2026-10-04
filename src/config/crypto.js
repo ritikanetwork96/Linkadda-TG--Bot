@@ -28,7 +28,10 @@ export function verifyPassword(password, storedPassword) {
   }
   const [salt, hash] = storedPassword.split(':');
   const checkHash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
-  return hash === checkHash;
+  const bufA = Buffer.from(hash, 'hex');
+  const bufB = Buffer.from(checkHash, 'hex');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
 }
 
 /**

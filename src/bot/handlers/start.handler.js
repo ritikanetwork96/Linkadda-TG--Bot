@@ -380,7 +380,7 @@ export async function startHandler(ctx) {
 
         let catName = 'None';
         if (content.categoryId) {
-          const cat = await Category.findOne({ _id: content.categoryId, botId });
+          const cat = await Category.findById(content.categoryId);
           if (cat) catName = cat.displayName || cat.name;
         }
 

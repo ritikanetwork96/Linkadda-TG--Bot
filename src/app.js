@@ -38,12 +38,13 @@ app.use(helmet({
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:", "https://*.filebase.com", "https://*.filebase.io", "https://*.amazonaws.com"],
       mediaSrc: ["'self'", "blob:", "https://*.filebase.com", "https://*.filebase.io", "https://*.amazonaws.com"],
-      connectSrc: ["'self'"],
+      connectSrc: ["'self'", "http://localhost:*", "http://127.0.0.1:*"],
       objectSrc: ["'none'"],
       upgradeInsecureRequests: [],
     },
   },
   crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: false,
 }));
 
 // 2. CORS configuration (allowing credentials for authorized origins only)
@@ -52,7 +53,7 @@ app.use(cors((req, callback) => {
   let corsOptions = {
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Request-ID']
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Request-ID', 'X-Bot-ID', 'x-bot-id', 'Accept']
   };
 
   // If same-origin (no Origin header) or request is coming from our own host, allow it
@@ -107,6 +108,7 @@ const loginLimiter = rateLimit({
   }
 });
 app.use('/api/admin/auth/login', loginLimiter);
+app.use('/api/admin/auth/token-login', loginLimiter);
 
 // 3c. Public Link Access Rate Limiter
 const linkLimiter = rateLimit({

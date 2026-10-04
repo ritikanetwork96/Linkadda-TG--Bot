@@ -32,12 +32,30 @@ async function loadUsersList() {
     const users      = response.users || [];
     const pagination = response.pagination;
 
+    // Data continuity notification banner
+    const alertContainer = document.getElementById('users-continuity-alert');
+    if (alertContainer) {
+      if (response.isFallback) {
+        const activeBotName = response.activeBot?.username ? `@${escapeHTML(response.activeBot.username)}` : 'your active bot';
+        alertContainer.innerHTML = `
+          <div class="alert alert-info mb-4" style="display:flex;align-items:center;gap:0.75rem;padding:0.85rem 1.15rem;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);border-radius:12px;font-size:0.85rem;color:var(--text)">
+            <span style="font-size:1.2rem">ℹ️</span>
+            <div>
+              <strong>Data Continuity Active:</strong> Showing previous platform users. As users interact with ${activeBotName}, their records will automatically transition here.
+            </div>
+          </div>
+        `;
+      } else {
+        alertContainer.innerHTML = '';
+      }
+    }
+
     // Update user count badge
     const countBadge = document.getElementById('users-total-count');
     if (countBadge) countBadge.textContent = pagination?.total ?? users.length;
 
     if (users.length === 0) {
-      tableBody.innerHTML = emptyRow(7, 'No users found', 'No Telegram users have interacted with this bot yet, or no users match your filters.');
+      tableBody.innerHTML = emptyRow(8, 'No users found', 'No Telegram users have interacted with this bot yet, or no users match your filters.');
       renderPagination(pagination);
       return;
     }
@@ -48,11 +66,16 @@ async function loadUsersList() {
       const displayName = [escapeHTML(user.firstName || ''), escapeHTML(user.lastName || '')].filter(Boolean).join(' ') || '<span class="text-dim">—</span>';
       const displayUsername = user.username ? `@${escapeHTML(user.username)}` : '<span class="text-dim">—</span>';
 
+      const botUsername = user.botId?.username ? `@${escapeHTML(user.botId.username)}` : (user.botId ? 'Bot' : '<span class="text-dim">Legacy</span>');
+      const isCurrentActive = response.activeBot && user.botId && String(user.botId._id || user.botId) === String(response.activeBot.id);
+      const botBadge = `<span class="badge ${isCurrentActive ? 'badge-primary' : 'badge-neutral'}" style="font-size:0.75rem">${botUsername}</span>`;
+
       return `
         <tr>
           <td><code style="font-size:0.75rem">${escapeHTML(String(user.telegramUserId))}</code></td>
           <td style="font-weight:600;color:var(--text)">${displayName}</td>
           <td class="text-muted">${displayUsername}</td>
+          <td>${botBadge}</td>
           <td>
             <span class="badge ${user.status === 'active' ? 'badge-success' : isBlocked ? 'badge-danger' : 'badge-neutral'}">
               ${escapeHTML(user.status)}
@@ -80,7 +103,7 @@ async function loadUsersList() {
 
   } catch (err) {
     console.error('Users load error:', err);
-    tableBody.innerHTML = errorRow(7, 'Failed to load users. Check your connection.');
+    tableBody.innerHTML = errorRow(8, 'Failed to load users. Check your connection.');
     Toast.error('Load Failed', 'Could not load users list.');
   }
 }

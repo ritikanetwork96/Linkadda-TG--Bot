@@ -1,8 +1,28 @@
 import { API } from './api.js';
 
+// Helper to escape HTML characters safely
+function escapeHTML(str) {
+  if (str === undefined || str === null) return '';
+  return str.toString()
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 window.addEventListener('load-bots', async () => {
   await loadBotsPool();
 });
+
+// Helper to refresh currently visible panel
+function reloadActiveTab() {
+  const activeTab = document.querySelector('.menu-items li.active');
+  if (activeTab) {
+    const tabId = activeTab.getAttribute('data-target');
+    window.dispatchEvent(new CustomEvent(`load-${tabId}`));
+  }
+}
 
 // Load the switcher globally on DOM Load
 document.addEventListener('DOMContentLoaded', async () => {
@@ -14,18 +34,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     switcher.addEventListener('change', () => {
       const selectedBotId = switcher.value;
       localStorage.setItem('admin_active_bot_id', selectedBotId);
-      
-      // Reload the active tab panel data!
-      const activeTab = document.querySelector('.menu-items li.active');
-      if (activeTab) {
-        const tabId = activeTab.getAttribute('data-target');
-        window.dispatchEvent(new CustomEvent(`load-${tabId}`));
-      }
+      reloadActiveTab();
     });
   }
 });
-
-
 
 export async function populateGlobalBotSwitcher() {
   const switcher = document.getElementById('active-bot-switcher');
@@ -69,6 +81,7 @@ export async function populateGlobalBotSwitcher() {
 
 async function loadBotsPool() {
   const tableBody = document.querySelector('#bots-list-table tbody');
+  if (!tableBody) return;
   tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Loading configured bots pool...</td></tr>`;
 
   try {
@@ -92,9 +105,13 @@ async function loadBotsPool() {
           <td>${b.username ? `<a href="https://t.me/${b.username}" target="_blank" style="color:var(--accent-cyan)">@${escapeHTML(b.username)}</a>` : '<span class="text-muted">Unlinked</span>'}</td>
           <td><span class="badge ${statusColor}">${escapeHTML(b.status.toUpperCase())}</span></td>
           <td>
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2" style="flex-wrap: wrap;">
               <button class="btn btn-secondary btn-sm test-bot-btn" data-id="${b._id}">Test Connection</button>
-              ${b.status !== 'connected' ? `<button class="btn btn-primary btn-sm activate-bot-btn" data-id="${b._id}">Activate</button>` : '<span class="badge badge-success text-center">ACTIVE</span>'}
+              ${b.status !== 'connected' 
+                ? `<button class="btn btn-primary btn-sm activate-bot-btn" data-id="${b._id}" data-name="${escapeHTML(b.displayName)}">Activate</button>` 
+                : '<span class="badge badge-success text-center" style="display:flex;align-items:center;padding:4px 8px;">ACTIVE</span>'
+              }
+              <button class="btn btn-warning btn-sm migrate-bot-btn" data-id="${b._id}" data-name="${escapeHTML(b.displayName)}" title="Transfer all platform assets from other bots to this bot">🔄 Transfer Data</button>
               <button class="btn btn-danger btn-sm delete-bot-btn" data-id="${b._id}">Delete</button>
             </div>
           </td>
@@ -123,18 +140,82 @@ async function loadBotsPool() {
       });
     });
 
-    // Bind Activate Bot
+    // Bind Activate Bot with Auto-Data Transfer
     document.querySelectorAll('.activate-bot-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
-        if (confirm('Are you sure you want to activate this bot token listener? Current bot listener will stop.')) {
-          try {
-            const res = await API.patch(`/bots/${id}/activate`);
-            alert(res.message || 'Bot listener activated successfully!');
+        const name = btn.getAttribute('data-name') || 'this bot';
+
+        const transfer = confirm(
+          `Activate "${name}" as your active bot?\n\n` +
+          `Do you want to TRANSFER ALL DATA (Categories, Media, Products/Packs, Links, Users & Settings) from the previous bot to "${name}"?\n\n` +
+          `• Click [OK] to ACTIVATE and TRANSFER ALL DATA seamlessly.\n` +
+          `• Click [Cancel] if you only want to switch listener without transferring old assets.`
+        );
+
+        let transferData = true;
+        if (!transfer) {
+          const proceedWithoutTransfer = confirm(`Do you want to switch listener to "${name}" without transferring previous data?`);
+          if (!proceedWithoutTransfer) return;
+          transferData = false;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Activating...';
+
+        try {
+          const res = await API.patch(`/bots/${id}/activate`, { transferData });
+          if (res.status === 'success') {
+            let msg = res.message || 'Bot listener activated successfully!';
+            if (res.migrationStats) {
+              const m = res.migrationStats;
+              msg += `\n\nData Transfer Summary:\n• ${m.categories} Categories\n• ${m.content} Media Files\n• ${m.contentPacks} Content Packs\n• ${m.links} Links\n• ${m.users} Users`;
+            }
+            alert(msg);
+
+            // Automatically set active switcher to this new bot
+            localStorage.setItem('admin_active_bot_id', id);
             await loadBotsPool();
             await populateGlobalBotSwitcher();
+            reloadActiveTab();
+          } else {
+            alert(res.message || 'Failed to activate bot.');
+          }
+        } catch (err) {
+          alert('Failed to activate bot token.');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Activate';
+        }
+      });
+    });
+
+    // Bind Manual Transfer Data Button
+    document.querySelectorAll('.migrate-bot-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        const name = btn.getAttribute('data-name') || 'this bot';
+
+        if (confirm(`Are you sure you want to TRANSFER ALL DATA (Categories, Media, Products/Packs, Links, Users & Settings) from other bots into "${name}"?`)) {
+          btn.disabled = true;
+          btn.textContent = 'Transferring...';
+          try {
+            const res = await API.post(`/bots/${id}/migrate-data`, {});
+            if (res.status === 'success') {
+              const m = res.migrationStats || {};
+              alert(`Migration Complete!\n\nTransferred to "${name}":\n• ${m.categories || 0} Categories\n• ${m.content || 0} Media Files\n• ${m.contentPacks || 0} Content Packs\n• ${m.links || 0} Links\n• ${m.users || 0} Users`);
+              localStorage.setItem('admin_active_bot_id', id);
+              await loadBotsPool();
+              await populateGlobalBotSwitcher();
+              reloadActiveTab();
+            } else {
+              alert(res.message || 'Data migration failed.');
+            }
           } catch (err) {
-            alert('Failed to activate bot token.');
+            alert('Data migration failed.');
+          } finally {
+            btn.disabled = false;
+            btn.textContent = '🔄 Transfer Data';
           }
         }
       });
@@ -151,6 +232,7 @@ async function loadBotsPool() {
               alert('Bot configuration deleted successfully!');
               await loadBotsPool();
               await populateGlobalBotSwitcher();
+              reloadActiveTab();
             } else {
               alert(res.message || 'Failed to delete bot config.');
             }
@@ -181,11 +263,16 @@ document.getElementById('botTokenForm').addEventListener('submit', async (e) => 
 
   try {
     const res = await API.post('/bots', { displayName, token });
-    if (res.status === 'success') {
-      alert('Bot configuration registered! Testing connection...');
+    if (res.status === 'success' && res.bot) {
+      alert(`Bot registered successfully! Testing connection with @${res.bot.username}...`);
+      
       // Auto test connection
-      const testRes = await API.post(`/bots/${res.bot._id}/test`);
-      alert(testRes.message);
+      try {
+        const testRes = await API.post(`/bots/${res.bot._id}/test`);
+        alert(testRes.message || 'Verified successfully.');
+      } catch (testErr) {
+        console.warn('Auto test error:', testErr);
+      }
       
       document.getElementById('botTokenForm').reset();
       await loadBotsPool();

@@ -74,12 +74,12 @@ async function loadContentList() {
     tableBody.innerHTML = items.map(item => {
       let previewHtml = '';
       if (item.type === 'photo' && item.downloadUrl) {
-        previewHtml = `<img src="${item.downloadUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid rgba(255,255,255,0.1)">`;
+        previewHtml = `<img src="${item.downloadUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:8px;border:1px solid rgba(255,255,255,0.12)" loading="lazy" onerror="this.style.display='none'">`;
       } else if (item.type === 'video' && item.downloadUrl) {
-        previewHtml = `<video src="${item.downloadUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid rgba(255,255,255,0.1)" muted preload="metadata"></video>`;
+        previewHtml = `<video src="${item.downloadUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:8px;border:1px solid rgba(255,255,255,0.12)" muted preload="metadata"></video>`;
       } else {
         const icon = item.type === 'link' ? '🔗' : item.type === 'text' ? '📝' : '📁';
-        previewHtml = `<div style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.05);border-radius:4px;font-size:1.1rem">${icon}</div>`;
+        previewHtml = `<div style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.05);border-radius:8px;font-size:1.1rem;border:1px solid rgba(255,255,255,0.08)">${icon}</div>`;
       }
 
       return `

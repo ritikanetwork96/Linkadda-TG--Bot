@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
   <title>Admin Panel - Content Delivery Bot</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/admin.css">
-  <link rel="stylesheet" href="css/components.css">
-  <link rel="stylesheet" href="css/media.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css?v=5.2">
+  <link rel="stylesheet" href="css/components.css?v=5.2">
+  <link rel="stylesheet" href="css/media.css?v=5.2">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
 </head>
 <body>
@@ -193,16 +193,20 @@
           <h4 class="card-title" style="margin:0">Quick Actions</h4>
           <div class="d-flex flex-wrap gap-2" style="margin-top: 0.5rem;">
             <button class="btn btn-primary btn-sm" onclick="window.location.hash='content'; window.openModal('content-editor')">
-              ➕ Add Content
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+              Add Content
             </button>
             <button class="btn btn-secondary btn-sm" onclick="window.location.hash='categories'; window.openModal('category')">
-              📁 Create Category
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+              Category
             </button>
             <button class="btn btn-secondary btn-sm" onclick="window.location.hash='content-packs'; window.openModal('pack-editor')">
-              📦 Create Pack
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+              Pack
             </button>
             <button class="btn btn-secondary btn-sm" onclick="window.location.hash='broadcasts'; window.openModal('broadcast-editor')">
-              📣 Broadcast
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+              Broadcast
             </button>
           </div>
         </div>
@@ -364,7 +368,8 @@
         </div>
         <div class="d-flex gap-2">
           <button class="btn btn-secondary" id="btn-bulk-upload">
-            📂 Bulk Upload
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            Bulk Upload
           </button>
           <button class="btn btn-primary" id="btn-add-content">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
@@ -478,7 +483,8 @@
         </div>
         <div class="d-flex gap-2">
           <button class="btn btn-secondary" id="btn-seed-demo-data">
-            ⚡ Seed Demo Data
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            Seed Demo Data
           </button>
           <button class="btn btn-primary" id="btn-create-pack">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
@@ -579,10 +585,11 @@
           <option value="inactive">Inactive</option>
         </select>
       </div>
+      <div id="users-continuity-alert"></div>
       <div class="table-container">
         <table class="data-table" id="users-table">
           <thead><tr>
-            <th>Telegram ID</th><th>Name</th><th>Username</th><th>Status</th><th>Joined</th><th>Last Active</th><th>Actions</th>
+            <th>Telegram ID</th><th>Name</th><th>Username</th><th>Bot</th><th>Status</th><th>Joined</th><th>Last Active</th><th>Actions</th>
           </tr></thead>
           <tbody></tbody>
         </table>
@@ -1657,30 +1664,47 @@
     </div>
   </div>
 
+  <!-- ========================================== -->
+  <!-- MODAL: CONFIRMATION DIALOG -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="modal-confirm">
+    <div class="modal" style="text-align: center;">
+      <div class="modal-body" style="padding: 2.2rem 1.8rem 1.5rem;">
+        <div class="confirm-icon warning">⚠️</div>
+        <h3 class="confirm-title" style="font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 700; margin-bottom: 0.6rem; color: var(--text-primary); letter-spacing: -0.01em;">Are you sure?</h3>
+        <p class="confirm-message" style="margin-bottom: 1.6rem;"></p>
+        <div class="modal-footer" style="border-top: none; background: transparent; padding: 0; justify-content: center; gap: 0.85rem;">
+          <button type="button" class="btn btn-secondary" id="confirm-cancel-btn" style="min-width: 110px; font-weight: 500;">Stay</button>
+          <button type="button" class="btn btn-primary" id="confirm-ok-btn" style="min-width: 110px; font-weight: 600;">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Main scripts -->
-  <script type="module" src="js/toast.js"></script>
-  <script type="module" src="js/confirm.js"></script>
-  <script type="module" src="js/api.js"></script>
-  <script type="module" src="js/auth.js"></script>
+  <script type="module" src="js/toast.js?v=5.4"></script>
+  <script type="module" src="js/confirm.js?v=5.4"></script>
+  <script type="module" src="js/api.js?v=5.4"></script>
+  <script type="module" src="js/auth.js?v=5.4"></script>
   
   <!-- Panel scripts -->
-  <script type="module" src="js/dashboard.js"></script>
-  <script type="module" src="js/bots.js"></script>
-  <script type="module" src="js/categories.js"></script>
-  <script type="module" src="js/content.js"></script>
-  <script type="module" src="js/media.js"></script>
-  <script type="module" src="js/start-content.js"></script>
-  <script type="module" src="js/content-packs.js"></script>
-  <script type="module" src="js/settings.js"></script>
-  <script type="module" src="js/links.js"></script>
-  <script type="module" src="js/users.js"></script>
-  <script type="module" src="js/broadcasts.js"></script>
-  <script type="module" src="js/logs.js"></script>
-  <script type="module" src="js/bot-menus.js"></script>
-  <script type="module" src="js/analytics.js"></script>
-  <script type="module" src="js/storage.js"></script>
-  <script type="module" src="js/system.js"></script>
-  <script type="module" src="js/bulk.js"></script>
+  <script type="module" src="js/dashboard.js?v=5.3"></script>
+  <script type="module" src="js/bots.js?v=5.3"></script>
+  <script type="module" src="js/categories.js?v=5.3"></script>
+  <script type="module" src="js/content.js?v=5.3"></script>
+  <script type="module" src="js/media.js?v=5.3"></script>
+  <script type="module" src="js/start-content.js?v=5.3"></script>
+  <script type="module" src="js/content-packs.js?v=5.3"></script>
+  <script type="module" src="js/settings.js?v=5.3"></script>
+  <script type="module" src="js/links.js?v=5.3"></script>
+  <script type="module" src="js/users.js?v=5.3"></script>
+  <script type="module" src="js/broadcasts.js?v=5.3"></script>
+  <script type="module" src="js/logs.js?v=5.3"></script>
+  <script type="module" src="js/bot-menus.js?v=5.3"></script>
+  <script type="module" src="js/analytics.js?v=5.3"></script>
+  <script type="module" src="js/storage.js?v=5.3"></script>
+  <script type="module" src="js/system.js?v=5.3"></script>
+  <script type="module" src="js/bulk.js?v=5.3"></script>
 
   <!-- Navigation / Modal controller -->
   <script type="module">

@@ -25,6 +25,7 @@ import { BotMenu } from '../models/BotMenu.js';
 import { EventLog } from '../models/EventLog.js';
 import { ContentPack } from '../models/ContentPack.js';
 import { DeliveryBatch } from '../models/DeliveryBatch.js';
+import { migrateBotData } from '../services/botMigration.service.js';
 
 const router = express.Router();
 
@@ -137,6 +138,11 @@ router.param('id', (req, res, next, id) => {
 const activeBotMiddleware = async (req, res, next) => {
   try {
     const xBotId = req.headers['x-bot-id'] || req.headers['x-active-bot-id'];
+    if (xBotId === 'all') {
+      req.botId = null;
+      req.isGlobalView = true;
+      return next();
+    }
     if (xBotId && mongoose.Types.ObjectId.isValid(xBotId)) {
       req.botId = new mongoose.Types.ObjectId(xBotId);
       return next();
@@ -187,11 +193,18 @@ router.get('/auth/token-login', async (req, res, next) => {
       return res.status(404).send('<h1>Error: Admin User Not Found</h1>');
     }
 
-    res.cookie('admin_token', token, {
+    // Issue a fresh, long-lived 30-day session token instead of reusing the short-lived link token
+    const sessionToken = jwt.sign(
+      { id: admin._id, email: admin.email, name: admin.name },
+      config.adminJwtSecret,
+      { expiresIn: '30d' }
+    );
+
+    res.cookie('admin_token', sessionToken, {
       httpOnly: true,
       secure: config.nodeEnv === 'production',
       sameSite: 'strict',
-      maxAge: 8 * 60 * 60 * 1000, // 8 hours
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     });
 
     return res.send(`
@@ -201,7 +214,7 @@ router.get('/auth/token-login', async (req, res, next) => {
       <body>
         <p>Verifying session, redirecting to Admin Dashboard...</p>
         <script>
-          localStorage.setItem('admin_token', ${JSON.stringify(token)});
+          localStorage.setItem('admin_token', ${JSON.stringify(sessionToken)});
           window.location.href = '/admin/index.html';
         </script>
       </body>
@@ -214,7 +227,7 @@ router.get('/auth/token-login', async (req, res, next) => {
 
 router.post('/auth/login', async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ status: 'error', message: 'Email and password are required.' });
@@ -231,11 +244,16 @@ router.post('/auth/login', async (req, res, next) => {
       return res.status(401).json({ status: 'error', message: 'Invalid credentials.' });
     }
 
+    // Determine session duration: 30 days if rememberMe is enabled (default true), else 24 hours
+    const isRemembered = rememberMe !== false;
+    const expiresIn = isRemembered ? '30d' : '24h';
+    const cookieMaxAge = isRemembered ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+
     // Sign JWT
     const token = jwt.sign(
       { id: admin._id, email: admin.email, name: admin.name },
       config.adminJwtSecret,
-      { expiresIn: '8h' }
+      { expiresIn }
     );
 
     // Write HttpOnly secure cookie
@@ -243,7 +261,7 @@ router.post('/auth/login', async (req, res, next) => {
       httpOnly: true,
       secure: config.nodeEnv === 'production',
       sameSite: 'strict',
-      maxAge: 8 * 60 * 60 * 1000, // 8 hours
+      maxAge: cookieMaxAge,
     });
 
     await ActivityLog.log('Admin login', admin._id, 'success', { 
@@ -311,13 +329,13 @@ router.patch('/auth/update-profile', authMiddleware, async (req, res, next) => {
     const newToken = jwt.sign(
       { id: admin._id, email: admin.email, name: admin.name },
       config.adminJwtSecret,
-      { expiresIn: '8h' }
+      { expiresIn: '30d' }
     );
     res.cookie('admin_token', newToken, {
       httpOnly: true,
       secure: config.nodeEnv === 'production',
       sameSite: 'strict',
-      maxAge: 8 * 60 * 60 * 1000,
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     });
 
     return res.json({
@@ -571,15 +589,6 @@ router.get('/analytics', authMiddleware, activeBotMiddleware, async (req, res, n
 // 3. BOTS MANAGEMENT & REGISTRATION
 // ==========================================
 
-router.get('/bots', authMiddleware, async (req, res, next) => {
-  try {
-    const bots = await BotModel.find().sort({ createdAt: -1 });
-    return res.json({ status: 'success', bots });
-  } catch (error) {
-    next(error);
-  }
-});
-
 router.post('/bots/validate', authMiddleware, async (req, res, next) => {
   try {
     const { token } = req.body;
@@ -588,7 +597,6 @@ router.post('/bots/validate', authMiddleware, async (req, res, next) => {
     }
 
     // Query telegram getMe to validate the token directly
-    const tempBot = new mongoose.mongo.Admin(mongoose.connection.db); // just dynamic verification
     const response = await fetch(`https://api.telegram.org/bot${token}/getMe`);
     const data = await response.json();
 
@@ -603,63 +611,6 @@ router.post('/bots/validate', authMiddleware, async (req, res, next) => {
         telegramBotId: data.result.id,
         username: data.result.username,
         firstName: data.result.first_name,
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.post('/bots', authMiddleware, async (req, res, next) => {
-  try {
-    const { token } = req.body;
-    const adminId = req.admin.id;
-
-    if (!token) {
-      return res.status(400).json({ status: 'error', message: 'Bot Token is required.' });
-    }
-
-    // 1. Validate token with Telegram API
-    const response = await fetch(`https://api.telegram.org/bot${token}/getMe`);
-    const data = await response.json();
-
-    if (!data.ok) {
-      return res.status(400).json({ status: 'error', message: 'Could not connect bot: Invalid token.' });
-    }
-
-    const botInfo = data.result;
-
-    // 2. Encrypt token at rest
-    const encryptedToken = encrypt(token);
-
-    // 3. Deactivate any currently active bots
-    await BotModel.updateMany({}, { $set: { status: 'inactive' } });
-
-    // 4. Upsert/Create bot info
-    const registeredBot = await BotModel.findOneAndUpdate(
-      { telegramBotId: botInfo.id },
-      {
-        username: botInfo.username,
-        firstName: botInfo.first_name,
-        status: 'active',
-        encryptedToken,
-      },
-      { upsert: true, new: true }
-    );
-
-    // 5. Trigger live bot listener restart dynamically
-    await reinitializeBot(token);
-
-    await ActivityLog.log('Connect Bot token', adminId, 'success', { botId: botInfo.id, username: botInfo.username });
-
-    return res.json({
-      status: 'success',
-      message: `Bot @${botInfo.username} registered and activated successfully.`,
-      bot: {
-        telegramBotId: registeredBot.telegramBotId,
-        username: registeredBot.username,
-        firstName: registeredBot.firstName,
-        status: registeredBot.status,
       }
     });
   } catch (error) {
@@ -907,7 +858,7 @@ router.get('/content', authMiddleware, activeBotMiddleware, async (req, res, nex
     const cleanCategoryId = cleanQueryString(req.query.categoryId);
     const cleanType = cleanQueryString(req.query.type);
     const cleanStatus = cleanQueryString(req.query.status);
-    const cleanSearch = cleanQueryString(req.query.search);
+    const cleanSearch = cleanQueryString(req.query.search).substring(0, 50);
     
     const page = Math.max(1, cleanQueryInt(req.query.page, 1));
     const limit = Math.max(1, Math.min(cleanQueryInt(req.query.limit, 25), 100)); // Hard capped at 100
@@ -949,17 +900,19 @@ router.get('/content', authMiddleware, activeBotMiddleware, async (req, res, nex
       .skip((page - 1) * limit)
       .limit(limit);
 
-    // Build public CDN URLs — no presigned URL needed (Filebase public bucket)
-    // Eliminates N sequential S3 HTTP calls per page load
-    const mappedContent = content.map((c) => {
+    // Build pre-signed download URLs for secure S3 media access (valid for 24 hours)
+    const mappedContent = await Promise.all(content.map(async (c) => {
       const obj = c.toObject();
       if (obj.storageKey) {
-        // Direct Filebase public URL — instant, no S3 round-trip
-        const bucketName = (obj.storageBucket || '').replace(/^https?:\/\//i, '').split('.')[0] || 'linkadda-bot';
-        obj.downloadUrl = `https://${bucketName}.s3.filebase.io/${obj.storageKey}`;
+        try {
+          obj.downloadUrl = await storageService.generatePresignedDownloadUrl(obj.storageKey, 86400);
+        } catch (e) {
+          const bucketName = (obj.storageBucket || '').replace(/^https?:\/\//i, '').split('.')[0] || 'linkadda-bot';
+          obj.downloadUrl = `https://${bucketName}.s3.filebase.io/${obj.storageKey}`;
+        }
       }
       return obj;
-    });
+    }));
 
     return res.json({
       status: 'success',
@@ -982,7 +935,16 @@ router.get('/content/:id', authMiddleware, async (req, res, next) => {
     if (!content) {
       return res.status(404).json({ status: 'error', message: 'Content not found.' });
     }
-    return res.json({ status: 'success', content });
+    const obj = content.toObject();
+    if (obj.storageKey) {
+      try {
+        obj.downloadUrl = await storageService.generatePresignedDownloadUrl(obj.storageKey, 86400);
+      } catch (e) {
+        const bucketName = (obj.storageBucket || '').replace(/^https?:\/\//i, '').split('.')[0] || 'linkadda-bot';
+        obj.downloadUrl = `https://${bucketName}.s3.filebase.io/${obj.storageKey}`;
+      }
+    }
+    return res.json({ status: 'success', content: obj });
   } catch (error) {
     next(error);
   }
@@ -1298,7 +1260,7 @@ router.post('/content/:id/share-link', authMiddleware, async (req, res, next) =>
       return res.status(404).json({ status: 'error', message: 'Content not found.' });
     }
 
-    const activeBotDoc = await BotModel.findOne({ status: 'active' });
+    const activeBotDoc = await BotModel.findOne({ status: { $in: ['connected', 'active'] } });
     const botUsername = activeBotDoc?.username || config.botUsername || 'Bot';
 
     // Format link: https://t.me/BOT_USERNAME?start=f_CONTENT_ID
@@ -1441,15 +1403,30 @@ router.get('/system/sessions', authMiddleware, async (req, res, next) => {
 
 router.get('/users', authMiddleware, activeBotMiddleware, async (req, res, next) => {
   try {
-    const cleanSearch = cleanQueryString(req.query.search);
+    const cleanSearch = cleanQueryString(req.query.search).substring(0, 50);
     const cleanStatus = cleanQueryString(req.query.status);
     
     const page = Math.max(1, cleanQueryInt(req.query.page, 1));
     const limit = Math.max(1, Math.min(cleanQueryInt(req.query.limit, 25), 100)); // Hard capped at 100
 
-    // Strict botId filter — only users belonging to the active bot
-    // No null fallback to avoid showing legacy/orphan records from other bots
-    const query = req.botId ? { botId: req.botId } : {};
+    let query = {};
+    let isShowingAllDueToNewBot = false;
+    let activeBotInfo = null;
+
+    if (req.botId && !req.isGlobalView) {
+      const activeBotDoc = await BotModel.findById(req.botId);
+      if (activeBotDoc) {
+        activeBotInfo = { id: activeBotDoc._id, username: activeBotDoc.username, firstName: activeBotDoc.firstName };
+      }
+      const botUserCount = await User.countDocuments({ botId: req.botId });
+      if (botUserCount > 0) {
+        query.botId = req.botId;
+      } else {
+        // Active bot has 0 users yet (brand new bot) -> gracefully show existing platform users so data never vanishes
+        isShowingAllDueToNewBot = true;
+      }
+    }
+
     if (cleanStatus && cleanStatus !== 'all') query.status = cleanStatus;
     
     if (cleanSearch) {
@@ -1468,6 +1445,7 @@ router.get('/users', authMiddleware, activeBotMiddleware, async (req, res, next)
 
     const total = await User.countDocuments(query);
     const users = await User.find(query)
+      .populate('botId', 'username firstName')
       .sort({ lastActiveAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -1476,6 +1454,8 @@ router.get('/users', authMiddleware, activeBotMiddleware, async (req, res, next)
     return res.json({
       status: 'success',
       users,
+      isFallback: isShowingAllDueToNewBot,
+      activeBot: activeBotInfo,
       pagination: {
         total,
         page,
@@ -2300,26 +2280,76 @@ router.post('/bots/:id/test', authMiddleware, async (req, res, next) => {
 
 router.patch('/bots/:id/activate', authMiddleware, async (req, res, next) => {
   try {
-    const botDoc = await BotModel.findById(req.params.id);
-    if (!botDoc) {
+    const targetBotDoc = await BotModel.findById(req.params.id);
+    if (!targetBotDoc) {
       return res.status(404).json({ status: 'error', message: 'Bot config not found.' });
     }
 
-    // Set all other bots as disconnected
-    await BotModel.updateMany({ _id: { $ne: botDoc._id } }, { $set: { status: 'disconnected' } });
+    // 1. Identify previous connected bot for automatic data migration
+    const previousConnectedBot = await BotModel.findOne({ status: 'connected', _id: { $ne: targetBotDoc._id } });
 
-    // Decrypt and hot-swap active bot token
-    const decryptedToken = decrypt(botDoc.encryptedToken);
+    // 2. Perform seamless data migration if requested (defaults to true)
+    let migrationStats = null;
+    const shouldTransfer = req.body && req.body.transferData !== false;
+    if (shouldTransfer) {
+      const sourceId = (req.body && req.body.fromBotId) || (previousConnectedBot ? previousConnectedBot._id : null);
+      try {
+        migrationStats = await migrateBotData(sourceId, targetBotDoc._id, { adminId: req.admin.id });
+      } catch (migErr) {
+        console.error('Bot Activation Data Migration Error:', migErr.message);
+      }
+    }
+
+    // 3. Set all other bots as disconnected
+    await BotModel.updateMany({ _id: { $ne: targetBotDoc._id } }, { $set: { status: 'disconnected' } });
+
+    // 4. Decrypt and hot-swap active bot token
+    const decryptedToken = decrypt(targetBotDoc.encryptedToken);
     const botInfo = await reinitializeBot(decryptedToken);
 
-    botDoc.status = 'connected';
-    botDoc.telegramBotId = botInfo.id;
-    botDoc.username = botInfo.username;
-    await botDoc.save();
+    targetBotDoc.status = 'connected';
+    targetBotDoc.telegramBotId = botInfo.id;
+    targetBotDoc.username = botInfo.username;
+    await targetBotDoc.save();
 
-    await ActivityLog.log('Active Telegram Bot Switched', req.admin.id, 'success', { botId: botDoc._id, username: botInfo.username });
+    await ActivityLog.log('Active Telegram Bot Switched', req.admin.id, 'success', {
+      botId: targetBotDoc._id,
+      username: botInfo.username,
+      migrated: migrationStats
+    });
 
-    res.json({ status: 'success', message: `Bot switched successfully. Active listener on @${botInfo.username}` });
+    res.json({
+      status: 'success',
+      message: `Bot switched successfully. Active listener on @${botInfo.username}${migrationStats ? '. Data transferred seamlessly.' : ''}`,
+      migrationStats,
+      botInfo: {
+        id: botInfo.id,
+        username: botInfo.username,
+        firstName: botInfo.first_name
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/bots/:id/migrate-data', authMiddleware, async (req, res, next) => {
+  try {
+    const targetBotId = req.params.id;
+    const { fromBotId } = req.body;
+
+    const targetBot = await BotModel.findById(targetBotId);
+    if (!targetBot) {
+      return res.status(404).json({ status: 'error', message: 'Target bot not found.' });
+    }
+
+    const migrationStats = await migrateBotData(fromBotId, targetBotId, { adminId: req.admin.id });
+
+    return res.json({
+      status: 'success',
+      message: `All platform data transferred to @${targetBot.username} successfully.`,
+      migrationStats
+    });
   } catch (err) {
     next(err);
   }
@@ -2334,6 +2364,12 @@ router.delete('/bots/:id', authMiddleware, async (req, res, next) => {
 
     if (botDoc.status === 'connected') {
       return res.status(400).json({ status: 'error', message: 'Cannot delete bot configuration while it is actively connected and running.' });
+    }
+
+    // If transferToBotId specified in query or body, transfer data first
+    const transferToId = req.body?.transferToBotId || req.query?.transferToBotId;
+    if (transferToId) {
+      await migrateBotData(botDoc._id, transferToId, { adminId: req.admin.id });
     }
 
     await BotModel.findByIdAndDelete(req.params.id);
@@ -2358,7 +2394,7 @@ router.get('/content-packs', authMiddleware, activeBotMiddleware, async (req, re
       return res.status(400).json({ status: 'error', message: 'No active bot selected.' });
     }
 
-    const cleanSearch = cleanQueryString(req.query.search);
+    const cleanSearch = cleanQueryString(req.query.search).substring(0, 50);
     const cleanStatus = cleanQueryString(req.query.status);
     
     const page = Math.max(1, cleanQueryInt(req.query.page, 1));
@@ -2777,7 +2813,7 @@ router.get('/links', authMiddleware, activeBotMiddleware, async (req, res, next)
       return res.status(400).json({ status: 'error', message: 'No active bot selected.' });
     }
 
-    const cleanSearch = cleanQueryString(req.query.search);
+    const cleanSearch = cleanQueryString(req.query.search).substring(0, 50);
     const cleanStatus = cleanQueryString(req.query.status);
     
     const page = Math.max(1, cleanQueryInt(req.query.page, 1));

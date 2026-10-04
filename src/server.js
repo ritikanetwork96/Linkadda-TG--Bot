@@ -1,3 +1,6 @@
+import dns from 'dns';
+try { dns.setServers(['8.8.8.8', '1.1.1.1']); } catch (e) {}
+
 import app from './app.js';
 import { config } from './config/env.js';
 import { connectDatabase, disconnectDatabase } from './config/database.js';
@@ -88,14 +91,17 @@ async function bootstrap() {
     }
 
     // 5. Load Active Bot Token from Database if configured
-    const activeDbBot = await BotModel.findOne({ status: 'active', encryptedToken: { $exists: true, $ne: '' } });
+    const activeDbBot = await BotModel.findOne({ 
+      status: { $in: ['connected', 'active'] }, 
+      encryptedToken: { $exists: true, $ne: '' } 
+    });
     let activeToken = config.userBotToken;
     if (activeDbBot && activeDbBot.encryptedToken) {
       try {
         const decrypted = decrypt(activeDbBot.encryptedToken);
         if (decrypted) {
           activeToken = decrypted;
-          console.log('Bootstrap: Dynamic active user bot token loaded from database.');
+          console.log(`Bootstrap: Dynamic active user bot token loaded from database (@${activeDbBot.username || 'bot'}).`);
         }
       } catch (err) {
         console.error('Bootstrap: Error decrypting stored bot token, using environment fallback:', err.message);
@@ -119,11 +125,25 @@ async function bootstrap() {
         {
           username: userBotInfo.username,
           firstName: userBotInfo.first_name,
-          status: 'active',
+          status: 'connected',
         },
         { upsert: true, new: true }
       );
       console.log('Bootstrap: User Bot metadata synchronized with MongoDB.');
+
+      // 7b. Automatically link any unlinked or previous bot assets (Categories, Media, Links) to this active bot
+      try {
+        const { migrateBotData } = await import('./services/botMigration.service.js');
+        const activeBotDoc = await BotModel.findOne({ telegramBotId: userBotInfo.id });
+        if (activeBotDoc) {
+          const syncStats = await migrateBotData(null, activeBotDoc._id);
+          if (syncStats.categories > 0 || syncStats.content > 0 || syncStats.links > 0) {
+            console.log(`Bootstrap: Asset auto-sync complete for @${userBotInfo.username}: ${syncStats.categories} categories, ${syncStats.content} media items, ${syncStats.links} links mapped.`);
+          }
+        }
+      } catch (syncErr) {
+        console.warn('Bootstrap: Asset sync check notice:', syncErr.message);
+      }
     } catch (err) {
       console.error('Bootstrap: User Bot token verification failed:', err.message, '— User Bot will not function.');
     }

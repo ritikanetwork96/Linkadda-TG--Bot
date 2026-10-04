@@ -1,5 +1,7 @@
 import express from 'express';
 import mongoose from 'mongoose';
+import { authMiddleware } from '../middleware/auth.middleware.js';
+import { config } from '../config/env.js';
 
 const router = express.Router();
 
@@ -68,8 +70,11 @@ router.get('/ready', (req, res) => {
  * ONE-TIME FIX: Drop old conflicting User unique index
  * Run once: GET http://localhost:3000/api/fix-user-index
  */
-router.get('/fix-user-index', async (req, res) => {
+router.get('/fix-user-index', authMiddleware, async (req, res) => {
   try {
+    if (config.nodeEnv === 'production') {
+      return res.status(403).json({ status: 'error', message: 'Index manipulation disabled in production.' });
+    }
     const db = mongoose.connection.db;
     const collection = db.collection('users');
 
@@ -105,7 +110,7 @@ router.get('/fix-user-index', async (req, res) => {
 /**
  * Debug Endpoint to check DB connection info as seen by the running server.
  */
-router.get('/api/debug-db', async (req, res) => {
+router.get('/api/debug-db', authMiddleware, async (req, res) => {
   try {
     const { Link } = await import('../models/Link.js');
     const { Content } = await import('../models/Content.js');
@@ -128,6 +133,16 @@ router.get('/api/debug-db', async (req, res) => {
       gitCommit = `error: ${gitErr.message}`;
     }
     
+    const { User } = await import('../models/User.js');
+    const { Bot } = await import('../models/Bot.js');
+    
+    const totalUsers = await User.countDocuments();
+    const botsList = await Bot.find().lean();
+    const userBotBreakdown = await User.aggregate([
+      { $group: { _id: '$botId', count: { $sum: 1 } } }
+    ]);
+    const recentUsers = await User.find().sort({ lastActiveAt: -1 }).limit(5).lean();
+
     return res.json({
       status: 'success',
       database: {
@@ -137,11 +152,12 @@ router.get('/api/debug-db', async (req, res) => {
       },
       counts: {
         links: totalLinks,
-        contents: totalContent
+        contents: totalContent,
+        users: totalUsers
       },
-      gitCommit,
-      lastLinks,
-      lastContents
+      bots: botsList.map(b => ({ id: b._id, username: b.username, name: b.firstName, status: b.status })),
+      userBotBreakdown,
+      recentUsers
     });
   } catch (err) {
     return res.status(500).json({ status: 'error', message: err.message, stack: err.stack });

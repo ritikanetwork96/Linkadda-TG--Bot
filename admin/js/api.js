@@ -6,7 +6,11 @@
  * - Handles common HTTP errors with clean messages
  */
 
-const BASE_URL = '/api/admin';
+const isDifferentLocalPort = window.location.port && 
+  window.location.port !== '3000' && 
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+const BASE_URL = isDifferentLocalPort ? 'http://localhost:3000/api/admin' : '/api/admin';
 
 // Error messages per HTTP status
 const STATUS_MESSAGES = {
@@ -31,9 +35,12 @@ export const API = {
     const token = localStorage.getItem('admin_token');
     if (token) headers.set('Authorization', `Bearer ${token}`);
 
-    // Attach active bot ID (for multi-bot context)
+    // Attach active bot ID (for multi-bot context, exclude auth routes)
+    const isAuthRoute = endpoint.startsWith('/auth/');
     const activeBotId = localStorage.getItem('admin_active_bot_id');
-    if (activeBotId && activeBotId !== 'all') headers.set('X-Bot-ID', activeBotId);
+    if (!isAuthRoute && activeBotId) {
+      headers.set('X-Bot-ID', activeBotId);
+    }
 
     // Set Content-Type for non-FormData bodies
     if (options.body && !(options.body instanceof FormData)) {

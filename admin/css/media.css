@@ -1,127 +1,380 @@
-/* Media Gallery Styles */
+/* ==========================================================================
+   MEDIA GALLERY & COMPREHENSIVE RESPONSIVE STYLES
+   Apple SaaS Design System (Mobile-First Polish)
+   ========================================================================== */
+
+/* ==========================================================================
+   1. MEDIA GALLERY (Apple Photos / QuickLook Style)
+   ========================================================================== */
 .media-gallery-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 1.5rem;
   margin-top: 1.5rem;
 }
 
 .media-card {
-  background: var(--bg-card);
+  background: var(--surface-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--r-xl);
   overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform var(--t-spring), box-shadow var(--t-base), border-color var(--t-base);
   position: relative;
   display: flex;
   flex-direction: column;
+  box-shadow: var(--shadow-glass);
 }
 
 .media-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(0,0,0,0.15);
-  border-color: var(--primary);
+  box-shadow: var(--specular-line), 0 20px 40px -10px rgba(0, 0, 0, 0.6);
+  border-color: var(--border-hover);
 }
 
 .media-thumbnail {
   width: 100%;
   aspect-ratio: 16 / 9;
-  background: var(--bg-body);
+  background: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .media-thumbnail img, .media-thumbnail video {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform var(--t-slow);
+}
+
+.media-card:hover .media-thumbnail img,
+.media-card:hover .media-thumbnail video {
+  transform: scale(1.05);
 }
 
 .media-thumbnail .media-icon {
   position: absolute;
-  color: var(--text-secondary);
-  opacity: 0.5;
+  color: var(--text-dim);
+  opacity: 0.65;
 }
 
 .media-thumbnail .video-badge {
   position: absolute;
-  bottom: 8px;
-  right: 8px;
-  background: rgba(0,0,0,0.7);
-  color: white;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #FFFFFF;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  font-size: 0.68rem;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .media-info {
-  padding: 1rem;
+  padding: 1.15rem;
   flex: 1;
   display: flex;
   flex-direction: column;
 }
 
 .media-title {
-  font-weight: 600;
-  font-size: 0.95rem;
-  margin-bottom: 0.25rem;
-  color: var(--text-main);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 0.96rem;
+  margin-bottom: 0.35rem;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: -0.01em;
 }
 
 .media-meta {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
+  font-size: 0.78rem;
+  color: var(--text-muted);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: 1rem;
 }
 
 .media-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.65rem;
   margin-top: auto;
 }
 
 .media-actions .btn {
   flex: 1;
-  padding: 0.4rem;
-  font-size: 0.8rem;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.78rem;
+  border-radius: var(--r-pill);
 }
 
-/* Fallback icons */
-.media-icon svg {
-  width: 48px;
-  height: 48px;
-}
-
-/* Delete button */
 .btn-delete-media {
   flex: 1;
-  padding: 0.4rem;
-  font-size: 0.8rem;
-  background: #ef4444;
-  color: #fff;
-  border: 1px solid #ef4444;
-  border-radius: 6px;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.78rem;
+  background: var(--danger-dim);
+  color: var(--danger);
+  border: 1px solid rgba(255, 69, 58, 0.3);
+  border-radius: var(--r-pill);
   cursor: pointer;
-  transition: background 0.15s ease, opacity 0.15s ease;
-  font-weight: 500;
+  transition: all var(--t-fast);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
 }
-
 .btn-delete-media:hover:not(:disabled) {
-  background: #dc2626;
-  border-color: #dc2626;
+  background: var(--danger);
+  color: #FFFFFF;
+  border-color: var(--danger);
+  box-shadow: 0 4px 14px rgba(255, 69, 58, 0.4);
+  transform: translateY(-1px);
+}
+.btn-delete-media:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.btn-delete-media:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+/* ==========================================================================
+   2. COMPREHENSIVE RESPONSIVE DEVICE SYSTEM
+   ========================================================================== */
+
+/* ---- Large Tablets & Small Laptops (max-width: 1024px) ---- */
+@media (max-width: 1024px) {
+  #sidebar {
+    transform: translateX(-100%);
+    box-shadow: none;
+  }
+  #sidebar.open {
+    transform: translateX(0);
+    box-shadow: 20px 0 50px rgba(0, 0, 0, 0.8);
+  }
+  #sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 250;
+  }
+  #sidebar.open ~ #sidebar-overlay {
+    display: block;
+  }
+  #main-content {
+    margin-left: 0 !important;
+  }
+  .hamburger {
+    display: inline-flex;
+  }
+  .panel {
+    padding: 1.75rem 1.85rem;
+  }
+}
+
+/* ---- Standard Tablets & Mobile Landscape (max-width: 768px) ---- */
+@media (max-width: 768px) {
+  :root {
+    --topbar-h: 60px;
+  }
+
+  /* Bottom iOS Floating Bar */
+  .mobile-bottom-nav {
+    display: flex;
+  }
+  #main-content {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+
+  .panel {
+    padding: 1.25rem 1rem;
+  }
+  .panel-header {
+    margin-bottom: 1.25rem;
+    gap: 0.75rem;
+  }
+  .panel-header h2, .panel-header h3 {
+    font-size: 1.2rem;
+  }
+
+  .row-split {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .top-bar {
+    padding: 0 1rem;
+    gap: 0.75rem;
+  }
+  .top-bar h2 {
+    font-size: 0.92rem;
+  }
+  .bot-selector-container label {
+    display: none;
+  }
+
+  /* Metric KPI Grid on Mobile */
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+  .metric-card {
+    padding: 1.1rem;
+    border-radius: var(--r-lg);
+  }
+  .metric-card .value {
+    font-size: 1.6rem;
+  }
+
+  /* Tables Fluid Touch Scroll */
+  .data-table {
+    font-size: 0.8rem;
+  }
+  .data-table th, .data-table td {
+    padding: 0.8rem 0.95rem;
+  }
+
+  /* iOS Bottom Sheet Modal Animation */
+  .modal-backdrop {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .modal {
+    max-width: 100%;
+    max-height: calc(100vh - 1.5rem);
+    border-radius: 28px 28px 0 0;
+    margin: auto 0 0;
+    animation: modalSlideUpMobile 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.8);
+  }
+  .modal::before {
+    content: '';
+    display: block;
+    width: 38px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 99px;
+    margin: 10px auto 0;
+  }
+  @keyframes modalSlideUpMobile {
+    from { opacity: 0; transform: translateY(100%); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .modal-footer {
+    flex-direction: column-reverse;
+    gap: 0.65rem;
+    padding-bottom: calc(1.2rem + env(safe-area-inset-bottom));
+  }
+  .modal-footer .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Mobile Filters Stack */
+  .filters-bar {
+    gap: 0.5rem;
+  }
+  .filters-bar select, .filters-bar .search-wrap {
+    flex: 1 1 auto;
+  }
+
+  /* Media Gallery on Mobile */
+  .media-gallery-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem;
+  }
+
+  /* iOS Auto-Zoom Protection (Mandatory 16px font-size) */
+  input[type="text"], input[type="email"], input[type="password"], 
+  input[type="number"], input[type="url"], input[type="datetime-local"], 
+  textarea, select, .form-input, .form-select {
+    font-size: 16px !important;
+  }
+}
+
+/* ---- Small Mobile Devices (iPhone SE / 320px - 480px) ---- */
+@media (max-width: 480px) {
+  :root {
+    --topbar-h: 56px;
+  }
+
+  .panel {
+    padding: 0.9rem 0.75rem;
+  }
+  .top-bar h2 {
+    display: none;
+  }
+  .top-bar .admin-profile {
+    display: none !important;
+  }
+  .bot-selector-container select {
+    max-width: 150px;
+    font-size: 0.76rem;
+    padding: 0.35rem 1.8rem 0.35rem 0.75rem;
+  }
+
+  /* Metric KPI Grid on Small Phone */
+  .metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+  .metric-card {
+    padding: 0.95rem 1rem;
+  }
+  .metric-card .value {
+    font-size: 1.55rem;
+  }
+
+  .filters-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filters-bar select,
+  .filters-bar .search-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .quick-actions-row {
+    width: 100%;
+  }
+  .quick-actions-row button,
+  .quick-actions-row a {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .card {
+    padding: 1.15rem 1rem;
+    border-radius: var(--r-lg);
+  }
+
+  .date-tabs {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  #toast-container {
+    top: 0.5rem;
+    right: 0.5rem;
+    left: 0.5rem;
+    width: auto;
+    max-width: none;
+  }
 }

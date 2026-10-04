@@ -73,9 +73,22 @@ export const telegramService = {
 
     switch (content.type) {
       case 'video': {
-        const fileSource = content.telegramFileId || (content.storageKey ? await storageService.generatePresignedDownloadUrl(content.storageKey, 900) : null);
-        sentMessage = await telegram.sendVideo(chatId, fileSource, sendOptions);
-        if (!content.telegramFileId && sentMessage.video) {
+        let fileSource = content.telegramFileId;
+        if (!fileSource && content.storageKey) {
+          fileSource = await storageService.generatePresignedDownloadUrl(content.storageKey, 900);
+        }
+        try {
+          sentMessage = await telegram.sendVideo(chatId, fileSource, sendOptions);
+        } catch (sendErr) {
+          if (content.telegramFileId && content.storageKey) {
+            console.warn(`TelegramService: sendVideo failed with file_id (${sendErr.message}), falling back to S3 presigned URL...`);
+            const fallbackUrl = await storageService.generatePresignedDownloadUrl(content.storageKey, 900);
+            sentMessage = await telegram.sendVideo(chatId, fallbackUrl, sendOptions);
+          } else {
+            throw sendErr;
+          }
+        }
+        if (sentMessage && sentMessage.video) {
           await Content.findByIdAndUpdate(content._id, {
             telegramFileId: sentMessage.video.file_id,
             telegramFileUniqueId: sentMessage.video.file_unique_id
@@ -84,9 +97,22 @@ export const telegramService = {
         break;
       }
       case 'photo': {
-        const fileSource = content.telegramFileId || (content.storageKey ? await storageService.generatePresignedDownloadUrl(content.storageKey, 900) : null);
-        sentMessage = await telegram.sendPhoto(chatId, fileSource, sendOptions);
-        if (!content.telegramFileId && sentMessage.photo) {
+        let fileSource = content.telegramFileId;
+        if (!fileSource && content.storageKey) {
+          fileSource = await storageService.generatePresignedDownloadUrl(content.storageKey, 900);
+        }
+        try {
+          sentMessage = await telegram.sendPhoto(chatId, fileSource, sendOptions);
+        } catch (sendErr) {
+          if (content.telegramFileId && content.storageKey) {
+            console.warn(`TelegramService: sendPhoto failed with file_id (${sendErr.message}), falling back to S3 presigned URL...`);
+            const fallbackUrl = await storageService.generatePresignedDownloadUrl(content.storageKey, 900);
+            sentMessage = await telegram.sendPhoto(chatId, fallbackUrl, sendOptions);
+          } else {
+            throw sendErr;
+          }
+        }
+        if (sentMessage && sentMessage.photo) {
           const largestPhoto = sentMessage.photo[sentMessage.photo.length - 1];
           await Content.findByIdAndUpdate(content._id, {
             telegramFileId: largestPhoto.file_id,
@@ -96,9 +122,22 @@ export const telegramService = {
         break;
       }
       case 'document': {
-        const fileSource = content.telegramFileId || (content.storageKey ? await storageService.generatePresignedDownloadUrl(content.storageKey, 900) : null);
-        sentMessage = await telegram.sendDocument(chatId, fileSource, sendOptions);
-        if (!content.telegramFileId && sentMessage.document) {
+        let fileSource = content.telegramFileId;
+        if (!fileSource && content.storageKey) {
+          fileSource = await storageService.generatePresignedDownloadUrl(content.storageKey, 900);
+        }
+        try {
+          sentMessage = await telegram.sendDocument(chatId, fileSource, sendOptions);
+        } catch (sendErr) {
+          if (content.telegramFileId && content.storageKey) {
+            console.warn(`TelegramService: sendDocument failed with file_id (${sendErr.message}), falling back to S3 presigned URL...`);
+            const fallbackUrl = await storageService.generatePresignedDownloadUrl(content.storageKey, 900);
+            sentMessage = await telegram.sendDocument(chatId, fallbackUrl, sendOptions);
+          } else {
+            throw sendErr;
+          }
+        }
+        if (sentMessage && sentMessage.document) {
           await Content.findByIdAndUpdate(content._id, {
             telegramFileId: sentMessage.document.file_id,
             telegramFileUniqueId: sentMessage.document.file_unique_id
@@ -202,27 +241,55 @@ export const telegramService = {
       sendOptions.protect_content = true;
     }
 
-    const sentMessages = await telegram.sendMediaGroup(chatId, mediaList, sendOptions);
+    let sentMessages;
+    try {
+      sentMessages = await telegram.sendMediaGroup(chatId, mediaList, sendOptions);
+    } catch (groupErr) {
+      console.warn(`TelegramService: sendMediaGroup failed (${groupErr.message}), falling back to direct S3 URLs...`);
+      const fallbackMediaList = [];
+      for (const item of items) {
+        const content = item.resolvedContent;
+        const caption = (item.captionOverride !== undefined && item.captionOverride !== null)
+          ? item.captionOverride
+          : content.caption;
+        const fallbackSource = content.storageKey
+          ? await storageService.generatePresignedDownloadUrl(content.storageKey, 900)
+          : content.telegramFileId;
+        const mediaItem = {
+          type: content.type,
+          media: fallbackSource,
+        };
+        if (caption) {
+          mediaItem.caption = caption;
+          const isOverride = item.captionOverride !== undefined && item.captionOverride !== null;
+          if (!isOverride && content.captionEntities && content.captionEntities.length > 0) {
+            mediaItem.caption_entities = content.captionEntities;
+          } else {
+            mediaItem.parse_mode = 'HTML';
+          }
+        }
+        fallbackMediaList.push(mediaItem);
+      }
+      sentMessages = await telegram.sendMediaGroup(chatId, fallbackMediaList, sendOptions);
+    }
 
     // Save deliveries and cache file_ids
     for (let i = 0; i < sentMessages.length; i++) {
       const sentMessage = sentMessages[i];
       const content = resolvedContents[i];
 
-      // Cache file_id if it wasn't there
-      if (!content.telegramFileId) {
-        if (content.type === 'video' && sentMessage.video) {
-          await Content.findByIdAndUpdate(content._id, {
-            telegramFileId: sentMessage.video.file_id,
-            telegramFileUniqueId: sentMessage.video.file_unique_id
-          });
-        } else if (content.type === 'photo' && sentMessage.photo) {
-          const largestPhoto = sentMessage.photo[sentMessage.photo.length - 1];
-          await Content.findByIdAndUpdate(content._id, {
-            telegramFileId: largestPhoto.file_id,
-            telegramFileUniqueId: largestPhoto.file_unique_id
-          });
-        }
+      // Cache or refresh file_id
+      if (content.type === 'video' && sentMessage.video) {
+        await Content.findByIdAndUpdate(content._id, {
+          telegramFileId: sentMessage.video.file_id,
+          telegramFileUniqueId: sentMessage.video.file_unique_id
+        });
+      } else if (content.type === 'photo' && sentMessage.photo) {
+        const largestPhoto = sentMessage.photo[sentMessage.photo.length - 1];
+        await Content.findByIdAndUpdate(content._id, {
+          telegramFileId: largestPhoto.file_id,
+          telegramFileUniqueId: largestPhoto.file_unique_id
+        });
       }
 
       await Delivery.create({

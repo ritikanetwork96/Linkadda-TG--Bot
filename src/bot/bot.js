@@ -318,11 +318,18 @@ class BotLifecycleManager {
         if (this.shutdownRequested) break;
 
         this.state = 'running';
-        this.reconnectAttempts = 0;
         this.pollingActive = true;
 
         console.log(`[BotLifecycleManager] ${this.name} launching polling...`);
+        
+        // Reset reconnect counters only after polling has run successfully for 30 seconds
+        const stableRunTimer = setTimeout(() => {
+          this.reconnectAttempts = 0;
+          this.conflictCount = 0;
+        }, 30000);
+
         await this.bot.launch();
+        clearTimeout(stableRunTimer);
         
         // If it resolved cleanly and shutdown wasn't requested:
         if (this.shutdownRequested) {
@@ -339,15 +346,29 @@ class BotLifecycleManager {
         if (this.shutdownRequested) break;
 
         this.lastError = err.message || 'Unknown polling error';
-        console.error(`[BotLifecycleManager] ${this.name} error:`, err.message);
 
         // Check if authentication failed (401)
         if (err.message && (err.message.includes('401') || err.message.includes('Unauthorized') || err.message.includes('blocked'))) {
           this.state = 'failed';
           this.tokenValid = false;
-          console.error(`[BotLifecycleManager] ${this.name} failed permanently (Authentication failed).`);
+          console.error(`[BotLifecycleManager] ${this.name} failed permanently (Authentication failed: ${err.message}).`);
           break; // Stop reconnect loop for invalid token
         }
+
+        // Check if another instance is already polling (409 Conflict)
+        const isConflict409 = err.message && (err.message.includes('409') || err.message.includes('Conflict'));
+        if (isConflict409) {
+          this.state = 'reconnecting';
+          this.conflictCount = (this.conflictCount || 0) + 1;
+          const conflictDelay = Math.min(30000 * this.conflictCount, 120000); // 30s, 60s, 90s, max 120s
+          console.warn(`[BotLifecycleManager] ⚠️ ${this.name}: Another instance (e.g. Render cloud or another node process) is actively polling this bot (409 Conflict). Pausing polling for ${conflictDelay / 1000}s to avoid connection collisions.`);
+          await new Promise(resolve => {
+            this.reconnectTimer = setTimeout(resolve, conflictDelay);
+          });
+          continue;
+        }
+
+        console.error(`[BotLifecycleManager] ${this.name} error:`, err.message);
 
         this.state = 'reconnecting';
         this.reconnectAttempts++;
@@ -466,6 +487,10 @@ export const telegramBotManager = {
 // Dynamic reinitialize (used by browser Admin Panel "Change Bot Token" feature)
 // ─────────────────────────────────────────────────────────────────────────────
 
+export function clearBotCache() {
+  botIdCache.clear();
+}
+
 /**
  * Dynamically reinitializes the USER bot with a new token without restarting server.
  * @param {string} newToken
@@ -474,6 +499,8 @@ export const telegramBotManager = {
 export async function reinitializeBot(newToken) {
   console.log('TelegramBotManager: Stopping User Bot for reinitialization...');
   await userBotManager.stop();
+
+  clearBotCache();
 
   const { telegramService } = await import('../services/telegram.service.js');
   bot.telegram.token = newToken;

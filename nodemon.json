@@ -1,0 +1,17 @@
+{
+  "watch": [
+    "src",
+    ".env"
+  ],
+  "ext": "js,mjs,json",
+  "ignore": [
+    "admin/**",
+    "logs/**",
+    "uploads/**",
+    "temp/**",
+    "scratch/**",
+    ".git/**",
+    "node_modules/**"
+  ],
+  "delay": 1000
+}

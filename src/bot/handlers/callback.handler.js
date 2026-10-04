@@ -173,7 +173,10 @@ export async function callbackHandler(ctx) {
         });
       }
 
-      const content = await Content.findOne({ _id: contentId, status: 'active', botId: ctx.state.botId });
+      const contentBotFilter = ctx.state.botId
+        ? { $or: [{ botId: ctx.state.botId }, { botId: { $exists: false } }, { botId: null }] }
+        : {};
+      const content = await Content.findOne({ _id: contentId, status: 'active', ...contentBotFilter });
       if (!content) {
         return ctx.editMessageText('⚠️ This content is no longer available.', {
           reply_markup: { inline_keyboard: [[{ text: '🏠 Home', callback_data: 'home' }]] }
@@ -187,7 +190,7 @@ export async function callbackHandler(ctx) {
       let backCallback = 'home';
 
       if (content.categoryId) {
-        const cat = await Category.findOne({ _id: content.categoryId, botId: ctx.state.botId });
+        const cat = await Category.findById(content.categoryId);
         if (cat) {
           catName = cat.displayName || cat.name;
           backCallback = `cat:${content.categoryId}:1`;
@@ -224,7 +227,10 @@ export async function callbackHandler(ctx) {
       requestCooldownCache.add(cooldownKey);
       setTimeout(() => requestCooldownCache.delete(cooldownKey), 2000);
 
-      const content = await Content.findOne({ _id: contentId, status: 'active', botId: ctx.state.botId });
+      const contentBotFilter = ctx.state.botId
+        ? { $or: [{ botId: ctx.state.botId }, { botId: { $exists: false } }, { botId: null }] }
+        : {};
+      const content = await Content.findOne({ _id: contentId, status: 'active', ...contentBotFilter });
       if (!content) {
         return ctx.answerCbQuery('⚠️ This content is unavailable.').catch(() => {});
       }
@@ -288,7 +294,10 @@ export async function callbackHandler(ctx) {
       await user.save();
 
       const limit = 8;
-      const query = { isFeatured: true, status: 'active', botId: ctx.state.botId };
+      const featBotFilter = ctx.state.botId
+        ? { $or: [{ botId: ctx.state.botId }, { botId: { $exists: false } }, { botId: null }] }
+        : {};
+      const query = { isFeatured: true, status: 'active', ...featBotFilter };
       const total = await Content.countDocuments(query);
       const totalPages = Math.ceil(total / limit);
 

@@ -13,6 +13,21 @@ export const userService = {
 
     const { id, username, first_name, last_name, language_code, is_bot } = telegramUser;
 
+    // Prune stale records from old/suspended bots when user transitions to active bot
+    if (botId) {
+      try {
+        const pruned = await User.deleteMany({
+          telegramUserId: id,
+          botId: { $ne: botId }
+        });
+        if (pruned.deletedCount > 0) {
+          console.log(`[UserService] User ${id} transitioned to active bot. Pruned ${pruned.deletedCount} old bot record(s).`);
+        }
+      } catch (cleanErr) {
+        console.warn('[UserService] Stale record prune notice:', cleanErr.message);
+      }
+    }
+
     const query = { telegramUserId: id };
     if (botId) {
       query.botId = botId;

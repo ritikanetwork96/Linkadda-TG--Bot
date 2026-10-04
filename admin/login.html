@@ -2,85 +2,154 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Login - Linkaadda Bot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+  <title>Admin Login — Bot SaaS Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-dark: #09090b;
-      --bg-card: rgba(17, 17, 20, 0.7);
-      --border-color: rgba(255, 255, 255, 0.08);
-      --text-main: #f4f4f5;
-      --text-muted: #a1a1aa;
-      --accent: #8b5cf6;
-      --accent-hover: #7c3aed;
-      --error: #ef4444;
-      --success: #10b981;
+      --bg: #07080D;
+      --surface-card: rgba(16, 18, 26, 0.72);
+      --border-color: rgba(255, 255, 255, 0.1);
+      --border-focus: rgba(10, 132, 255, 0.55);
+      --text-main: #FFFFFF;
+      --text-muted: #8E8E93;
+      --accent: #0A84FF;
+      --accent-hover: #2F95FF;
+      --accent-gradient: linear-gradient(180deg, #0A84FF 0%, #0071E3 100%);
+      --error: #FF453A;
+      --success: #30D158;
+      --r-card: 24px;
+      --r-input: 12px;
     }
 
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
     body {
-      font-family: 'Inter', sans-serif;
-      background-color: var(--bg-dark);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
       color: var(--text-main);
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      overflow: auto;
+      min-height: 100dvh;
+      overflow-x: hidden;
       position: relative;
-      padding: 1rem;
+      padding: 1.5rem;
     }
 
-    /* Ambient glow background */
-    body::before {
-      content: '';
+    /* Apple macOS Ambient Glowing Mesh Orbs */
+    .bg-ambient-orb {
       position: fixed;
-      width: 400px;
-      height: 400px;
-      background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
-      top: -100px;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+      filter: blur(80px);
+      opacity: 0.65;
+    }
+
+    .bg-ambient-orb-1 {
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(10, 132, 255, 0.28) 0%, rgba(94, 92, 230, 0.12) 50%, transparent 70%);
+      top: -120px;
       right: -100px;
-      z-index: 0;
-      pointer-events: none;
+      animation: ambientFloat1 18s ease-in-out infinite alternate;
     }
 
-    body::after {
-      content: '';
-      position: fixed;
-      width: 400px;
-      height: 400px;
-      background: radial-gradient(circle, rgba(6, 182, 212, 0.1) 0%, rgba(0, 0, 0, 0) 70%);
-      bottom: -100px;
-      left: -100px;
-      z-index: 0;
-      pointer-events: none;
+    .bg-ambient-orb-2 {
+      width: 520px;
+      height: 520px;
+      background: radial-gradient(circle, rgba(100, 210, 255, 0.2) 0%, rgba(191, 90, 242, 0.12) 50%, transparent 70%);
+      bottom: -140px;
+      left: -120px;
+      animation: ambientFloat2 22s ease-in-out infinite alternate;
     }
 
+    @keyframes ambientFloat1 {
+      0% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(-40px, 50px) scale(1.08); }
+      100% { transform: translate(30px, -20px) scale(0.95); }
+    }
+
+    @keyframes ambientFloat2 {
+      0% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(50px, -40px) scale(1.05); }
+      100% { transform: translate(-30px, 30px) scale(0.92); }
+    }
+
+    /* Apple Sequoia Translucent Frosted Glass Card */
     .login-container {
-      background: var(--bg-card);
+      background: var(--surface-card);
       border: 1px solid var(--border-color);
-      backdrop-filter: blur(16px);
-      padding: 2.25rem;
-      border-radius: 16px;
+      box-shadow: 
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.16),
+        0 24px 60px -12px rgba(0, 0, 0, 0.7),
+        0 0 1px 1px rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(40px) saturate(200%);
+      -webkit-backdrop-filter: blur(40px) saturate(200%);
+      padding: 2.75rem 2.5rem;
+      border-radius: var(--r-card);
       width: 100%;
-      max-width: 420px;
+      max-width: 440px;
       z-index: 10;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      position: relative;
+      animation: cardAppear 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
-    @media (max-width: 480px) {
-      .login-container {
-        padding: 1.5rem 1.25rem;
-        border-radius: 12px;
+    @keyframes cardAppear {
+      from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.97);
       }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* Apple Squircle App Icon Badge */
+    .app-badge {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 1.5rem auto;
+      border-radius: 16px;
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.03) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      box-shadow: 
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.3),
+        0 10px 24px -4px rgba(10, 132, 255, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .app-badge::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 45%;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, transparent 100%);
+      border-radius: 16px 16px 0 0;
+    }
+
+    .app-badge svg {
+      width: 26px;
+      height: 26px;
+      color: #64D2FF;
+      filter: drop-shadow(0 2px 6px rgba(10, 132, 255, 0.5));
     }
 
     .header {
@@ -89,12 +158,12 @@
     }
 
     .header h1 {
-      font-family: 'Outfit', sans-serif;
-      font-size: 1.8rem;
+      font-family: 'Outfit', -apple-system, sans-serif;
+      font-size: 1.85rem;
       font-weight: 700;
-      letter-spacing: -0.02em;
-      margin-bottom: 0.5rem;
-      background: linear-gradient(135deg, #fff 0%, #a1a1aa 100%);
+      letter-spacing: -0.03em;
+      margin-bottom: 0.4rem;
+      background: linear-gradient(135deg, #FFFFFF 0%, #D1D1D6 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
@@ -102,6 +171,7 @@
     .header p {
       color: var(--text-muted);
       font-size: 0.9rem;
+      font-weight: 400;
     }
 
     .form-group {
@@ -111,86 +181,117 @@
     .form-group label {
       display: block;
       margin-bottom: 0.5rem;
-      font-size: 0.85rem;
-      font-weight: 500;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
       color: var(--text-muted);
     }
 
+    /* Apple Dark Inset Input */
     .form-group input {
       width: 100%;
-      background: rgba(255, 255, 255, 0.03);
+      background: rgba(255, 255, 255, 0.04);
       border: 1px solid var(--border-color);
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+      padding: 0.85rem 1rem;
+      border-radius: var(--r-input);
       color: var(--text-main);
-      font-size: 0.95rem;
-      transition: all 0.2s ease;
+      font-size: 1rem; /* 16px minimum prevents iOS auto-zoom */
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
       outline: none;
+      font-family: inherit;
+    }
+
+    .form-group input::placeholder {
+      color: rgba(255, 255, 255, 0.24);
     }
 
     .form-group input:focus {
-      border-color: var(--accent);
-      background: rgba(255, 255, 255, 0.06);
-      box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+      border-color: var(--border-focus);
+      background: rgba(255, 255, 255, 0.07);
+      box-shadow: 
+        inset 0 1px 2px rgba(0, 0, 0, 0.3),
+        0 0 0 3px rgba(10, 132, 255, 0.25);
     }
 
+    /* Apple Tactile Pill Button */
     .btn-login {
       width: 100%;
-      background: var(--accent);
+      background: var(--accent-gradient);
       color: white;
       border: none;
-      padding: 0.75rem;
-      border-radius: 8px;
+      padding: 0.88rem 1rem;
+      border-radius: var(--r-input);
       font-weight: 600;
       font-size: 0.95rem;
+      letter-spacing: -0.01em;
       cursor: pointer;
-      transition: all 0.2s ease;
-      margin-top: 1rem;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      margin-top: 1.25rem;
       display: flex;
       justify-content: center;
       align-items: center;
+      box-shadow: 
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.24),
+        0 4px 14px rgba(10, 132, 255, 0.35);
+      position: relative;
     }
 
     .btn-login:hover {
-      background: var(--accent-hover);
-      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+      background: linear-gradient(180deg, #2F95FF 0%, #0A84FF 100%);
+      box-shadow: 
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.3),
+        0 6px 20px rgba(10, 132, 255, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .btn-login:active {
+      transform: scale(0.98);
+      box-shadow: 0 2px 8px rgba(10, 132, 255, 0.3);
     }
 
     .btn-login:disabled {
-      background: rgba(139, 92, 246, 0.5);
+      opacity: 0.55;
       cursor: not-allowed;
+      transform: none;
     }
 
+    /* iOS Frosted Alert Feedback */
     .alert {
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      margin-bottom: 1.25rem;
+      padding: 0.85rem 1rem;
+      border-radius: var(--r-input);
+      font-size: 0.86rem;
+      line-height: 1.4;
+      margin-bottom: 1.35rem;
       display: none;
       border: 1px solid transparent;
-      animation: fadeIn 0.3s ease;
+      animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
     }
 
     .alert-error {
-      background: rgba(239, 68, 68, 0.1);
-      border-color: rgba(239, 68, 68, 0.2);
-      color: #fca5a5;
+      background: rgba(255, 69, 58, 0.12);
+      border-color: rgba(255, 69, 58, 0.24);
+      color: #FF8F88;
     }
 
     .alert-success {
-      background: rgba(16, 185, 129, 0.1);
-      border-color: rgba(16, 185, 129, 0.2);
-      color: #a7f3d0;
+      background: rgba(48, 209, 88, 0.12);
+      border-color: rgba(48, 209, 88, 0.24);
+      color: #6CE88E;
     }
 
+    /* Apple Circular Loading Indicator */
     .spinner {
-      width: 20px;
-      height: 20px;
-      border: 2px solid rgba(255, 255, 255, 0.3);
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255, 255, 255, 0.25);
       border-radius: 50%;
-      border-top-color: white;
-      animation: spin 0.8s linear infinite;
-      margin-right: 0.5rem;
+      border-top-color: #FFFFFF;
+      animation: spin 0.75s linear infinite;
+      margin-right: 0.6rem;
       display: none;
     }
 
@@ -199,14 +300,122 @@
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-5px); }
+      from { opacity: 0; transform: translateY(-4px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Subtle Link Styles */
+    a.subtle-link {
+      font-size: 0.82rem;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.18s ease;
+    }
+
+    a.subtle-link:hover {
+      color: var(--accent-hover);
+      text-decoration: underline;
+    }
+
+    .footer-note {
+      text-align: center;
+      margin-top: 1.75rem;
+      font-size: 0.78rem;
+      color: rgba(255, 255, 255, 0.35);
+      letter-spacing: 0.01em;
+    }
+
+    /* Apple-style Remember Me & Options Row */
+    .remember-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 0.15rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .remember-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+      transition: color 0.15s ease;
+    }
+
+    .remember-label:hover {
+      color: var(--text-main);
+    }
+
+    .custom-checkbox {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 17px;
+      height: 17px;
+      border: 1.5px solid rgba(255, 255, 255, 0.28);
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.05);
+      cursor: pointer;
+      display: grid;
+      place-content: center;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .custom-checkbox:hover {
+      border-color: rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .custom-checkbox:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 0 10px rgba(10, 132, 255, 0.4);
+    }
+
+    .custom-checkbox:checked::before {
+      content: "";
+      width: 9px;
+      height: 5px;
+      border-left: 2px solid white;
+      border-bottom: 2px solid white;
+      transform: rotate(-45deg) translate(0.5px, -0.5px);
+    }
+
+    .custom-checkbox:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 1rem 0.75rem;
+      }
+      .login-container {
+        padding: 2rem 1.35rem;
+        border-radius: 20px;
+      }
+      .header h1 {
+        font-size: 1.6rem;
+      }
     }
   </style>
 </head>
 <body>
 
+  <!-- Background Ambient Glow -->
+  <div class="bg-ambient-orb bg-ambient-orb-1"></div>
+  <div class="bg-ambient-orb bg-ambient-orb-2"></div>
+
   <div class="login-container">
+    <div class="app-badge">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
+      </svg>
+    </div>
+
     <div class="header">
       <h1>Content Delivery Bot</h1>
       <p>Sign in to the Admin Dashboard</p>
@@ -214,25 +423,35 @@
 
     <div id="alertBox" class="alert"></div>
 
+    <!-- Login Form -->
     <form id="loginForm">
       <div class="form-group">
         <label for="email">Username or Email</label>
         <input type="email" id="email" required placeholder="admin@bot.com" autocomplete="username">
       </div>
-      <div class="form-group">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <label for="password" style="margin-bottom: 0.5rem;">Password</label>
-          <a href="#" id="forgotPasswordLink" style="font-size: 0.8rem; color: var(--accent); text-decoration: none; margin-bottom: 0.5rem;">Forgot Password?</a>
+      <div class="form-group" style="margin-bottom: 0.85rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <label for="password" style="margin-bottom: 0;">Password</label>
+          <a href="#" id="forgotPasswordLink" class="subtle-link">Forgot Password?</a>
         </div>
         <input type="password" id="password" required placeholder="••••••••" autocomplete="current-password">
       </div>
 
-      <button type="submit" id="submitBtn" class="btn-login">
+      <div class="remember-row">
+        <label class="remember-label" for="rememberMe">
+          <input type="checkbox" id="rememberMe" class="custom-checkbox" checked>
+          <span>Remember me</span>
+        </label>
+        <span style="font-size: 0.76rem; color: rgba(255, 255, 255, 0.38);">30 Days Session</span>
+      </div>
+
+      <button type="submit" id="submitBtn" class="btn-login" style="margin-top: 0;">
         <div id="btnSpinner" class="spinner"></div>
         <span id="btnText">Sign In</span>
       </button>
     </form>
 
+    <!-- Forgot Password Form -->
     <form id="forgotForm" style="display: none;">
       <div class="form-group">
         <label for="forgotEmail">Admin Email</label>
@@ -244,10 +463,11 @@
         <span id="forgotBtnText">Send OTP to Telegram</span>
       </button>
       <div style="text-align: center; margin-top: 1.25rem;">
-        <a href="#" id="backToLoginLink" style="font-size: 0.85rem; color: var(--text-muted); text-decoration: none;">Back to Sign In</a>
+        <a href="#" id="backToLoginLink" class="subtle-link" style="color: var(--text-muted);">← Back to Sign In</a>
       </div>
     </form>
 
+    <!-- Reset Password Form -->
     <form id="resetForm" style="display: none;">
       <div class="form-group">
         <label for="resetOtp">6-Digit Verification Code (OTP)</label>
@@ -267,16 +487,28 @@
         <span id="resetBtnText">Reset Password</span>
       </button>
       <div style="text-align: center; margin-top: 1.25rem;">
-        <a href="#" id="backToLoginLink2" style="font-size: 0.85rem; color: var(--text-muted); text-decoration: none;">Back to Sign In</a>
+        <a href="#" id="backToLoginLink2" class="subtle-link" style="color: var(--text-muted);">← Back to Sign In</a>
       </div>
     </form>
+
+    <div class="footer-note">
+      Protected with End-to-End Session Security &bull; v5.0
+    </div>
   </div>
 
   <script type="module" src="js/api.js"></script>
   <script type="module" src="js/auth.js"></script>
   <script type="module">
-    // Handle redirect if already logged in
+    // Handle redirect if already logged in, and pre-fill remembered email
     document.addEventListener('DOMContentLoaded', async () => {
+      const savedEmail = localStorage.getItem('admin_remembered_email');
+      if (savedEmail) {
+        const emailEl = document.getElementById('email');
+        if (emailEl) emailEl.value = savedEmail;
+        const rememberCheckbox = document.getElementById('rememberMe');
+        if (rememberCheckbox) rememberCheckbox.checked = true;
+      }
+
       // Check auth state using token verification
       const isLoggedIn = await Auth.checkAuthSilent();
       if (isLoggedIn) {
@@ -320,6 +552,7 @@
       
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
+      const rememberMe = document.getElementById('rememberMe')?.checked ?? true;
 
       // Show Loading State
       alertBox.style.display = 'none';
@@ -328,7 +561,7 @@
       btnText.textContent = 'Authenticating...';
 
       try {
-        const response = await API.post('/auth/login', { email, password });
+        const response = await API.post('/auth/login', { email, password, rememberMe });
         
         if (response.status === 'success') {
           // Success Feedback
@@ -339,9 +572,16 @@
           // Save JWT in localStorage as fallback
           localStorage.setItem('admin_token', response.token);
           
+          // Remember email preference
+          if (rememberMe) {
+            localStorage.setItem('admin_remembered_email', email);
+          } else {
+            localStorage.removeItem('admin_remembered_email');
+          }
+          
           setTimeout(() => {
             window.location.href = 'index.html';
-          }, 1000);
+          }, 800);
         } else {
           showError(response.message || 'Invalid username or password.');
         }

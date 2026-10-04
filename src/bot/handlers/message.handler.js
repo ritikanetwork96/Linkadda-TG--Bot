@@ -41,10 +41,14 @@ export async function messageHandler(ctx) {
 
       const escaped = escapeRegex(cleanSearch);
 
+      const botFilter = botId
+        ? { $or: [{ botId }, { botId: { $exists: false } }, { botId: null }] }
+        : {};
+
       // Fetch active categories that match the term within this bot
       const matchedCats = await Category.find({
         status: 'active',
-        botId,
+        ...botFilter,
         $or: [
           { name: { $regex: escaped, $options: 'i' } },
           { displayName: { $regex: escaped, $options: 'i' } }
@@ -53,7 +57,7 @@ export async function messageHandler(ctx) {
 
       const query = {
         status: 'active',
-        botId,
+        ...botFilter,
         $or: [
           { title: { $regex: escaped, $options: 'i' } },
           { caption: { $regex: escaped, $options: 'i' } }
