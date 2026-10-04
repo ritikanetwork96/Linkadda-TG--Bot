@@ -70,9 +70,6 @@ export async function startHandler(ctx) {
     const user = await userService.upsertUser(telegramUser, botId);
     const settings = ctx.state.settings;
 
-    user.navigationState = { searchMode: false, currentMenu: 'home' };
-    await user.save();
-
     const payload = ctx.payload;
 
     if (payload) {
@@ -425,20 +422,34 @@ export async function startHandler(ctx) {
     }
 
     // --- Normal Start Flow ---
-    await EventLog.log('user_started', user._id, telegramUser.id, '', {}, botId);
+    EventLog.log('user_started', user._id, telegramUser.id, '', {}, botId).catch(() => {});
+
+    // Resolve active bot name and format personalized welcome message
+    const { Bot: BotModel } = await import('../../models/Bot.js');
+    const { formatWelcomeMessage } = await import('../../utils/welcomeFormatter.js');
+
+    let botDoc = null;
+    if (botId) {
+      botDoc = await BotModel.findById(botId).select('firstName username').lean().catch(() => null);
+    }
+
+    const botName = botDoc?.firstName || ctx.botInfo?.first_name || 'Bot';
+    const rawWelcome = settings.welcomeMessage || 'Welcome.';
+    const formattedWelcome = formatWelcomeMessage(rawWelcome, {
+      displayName: botName,
+      firstName: ctx.botInfo?.first_name,
+      username: ctx.botInfo?.username
+    }, telegramUser);
 
     const behaviour = settings.startBehaviour || 'WELCOME_ONLY';
 
     if (behaviour === 'WELCOME_ONLY') {
-      const text = settings.welcomeMessage || 'Welcome.';
-      await ctx.reply(text).catch(() => {});
+      await ctx.reply(formattedWelcome).catch(() => {});
     } else if (behaviour === 'WELCOME_MENU') {
-      const text = settings.welcomeMessage || 'Welcome.';
       const menuMarkup = await buildMainMenuMarkup(botId);
-      await ctx.reply(text, menuMarkup).catch(() => {});
+      await ctx.reply(formattedWelcome, menuMarkup).catch(() => {});
     } else if (behaviour === 'CONFIGURED_CONTENT') {
-      const text = settings.welcomeMessage || 'Welcome.';
-      await ctx.reply(text).catch(() => {});
+      await ctx.reply(formattedWelcome).catch(() => {});
 
       // Retrieve configured start content
       const startContents = await contentService.getStartContents(settings.startContentLimit, botId);
@@ -452,7 +463,7 @@ export async function startHandler(ctx) {
           } catch (err) {
             console.error(`Start Handler: Failed to deliver start content item:`, err.message);
           }
-          await new Promise(r => setTimeout(r, 100)); // safe delay
+          await new Promise(r => setTimeout(r, 60)); // minimal safe delay
         }
       }
     } else if (behaviour === 'CONFIGURED_SEQUENCE') {
@@ -465,8 +476,7 @@ export async function startHandler(ctx) {
           console.error(`Start Handler: Failed to deliver start sequence:`, err.message);
         }
       } else {
-        const text = settings.welcomeMessage || 'Welcome.';
-        await ctx.reply(text).catch(() => {});
+        await ctx.reply(formattedWelcome).catch(() => {});
       }
     } else if (behaviour === 'DISABLED') {
       // Do nothing

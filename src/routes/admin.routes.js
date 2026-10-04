@@ -2226,6 +2226,32 @@ router.post('/bots', authMiddleware, async (req, res, next) => {
       status: 'disconnected'
     });
 
+    // 4. Initialize personalized settings for this new bot so its welcome message automatically features its name
+    try {
+      const { Setting } = await import('../models/Setting.js');
+      const { adaptWelcomeMessageForBot } = await import('../utils/welcomeFormatter.js');
+
+      // Find template welcome message from previous bot
+      const prevSetting = await Setting.findOne({}).sort({ updatedAt: -1 });
+      const baseWelcome = prevSetting?.welcomeMessage || '👋 Welcome to {botName} !!\n\nYe bot sirf invite link ke through hi demo dikhata hai. Apne seller se latest demo link maango.';
+      const newBotName = bot.firstName || bot.username || 'Bot';
+      const personalizedWelcome = adaptWelcomeMessageForBot(baseWelcome, newBotName);
+
+      const botSetting = await Setting.getSettings(bot._id);
+      botSetting.welcomeMessage = personalizedWelcome;
+      if (prevSetting) {
+        botSetting.startBehaviour = prevSetting.startBehaviour;
+        botSetting.autoDeleteEnabled = prevSetting.autoDeleteEnabled;
+        botSetting.autoDeleteHours = prevSetting.autoDeleteHours;
+        botSetting.helpMessage = prevSetting.helpMessage;
+        botSetting.supportLink = prevSetting.supportLink;
+      }
+      await botSetting.save();
+      Setting.clearCache(bot._id);
+    } catch (setErr) {
+      console.warn('POST /bots: Personalized welcome settings auto-config notice:', setErr.message);
+    }
+
     await ActivityLog.log('Bot configuration added', req.admin.id, 'success', { botId: bot._id, displayName: bot.firstName });
 
     res.status(201).json({ 

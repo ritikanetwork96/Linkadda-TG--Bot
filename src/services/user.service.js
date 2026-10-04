@@ -31,6 +31,7 @@ export const userService = {
           isBot: !!is_bot,
           lastActiveAt: new Date(),
           status: 'active', // Ensure they are marked active
+          navigationState: { searchMode: false, currentMenu: 'home' },
         },
         $setOnInsert: {
           startedAt: new Date(),

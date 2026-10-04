@@ -175,8 +175,25 @@ export async function migrateBotData(fromBotId, toBotId, options = {}) {
     }
 
     if (sourceSetting) {
+      const { adaptWelcomeMessageForBot } = await import('../utils/welcomeFormatter.js');
       const targetSetting = await Setting.getSettings(targetObjectId);
-      targetSetting.welcomeMessage = sourceSetting.welcomeMessage;
+      const targetBot = await BotModel.findById(targetObjectId);
+      const targetBotName = targetBot?.firstName || targetBot?.username || 'Bot';
+
+      let sourceBotName = null;
+      if (fromBotId && mongoose.Types.ObjectId.isValid(fromBotId)) {
+        const sourceBot = await BotModel.findById(fromBotId);
+        sourceBotName = sourceBot?.firstName || sourceBot?.username || null;
+      }
+
+      // Automatically personalize welcome message with target bot's display name
+      const adaptedWelcome = adaptWelcomeMessageForBot(
+        sourceSetting.welcomeMessage,
+        targetBotName,
+        sourceBotName
+      );
+
+      targetSetting.welcomeMessage = adaptedWelcome;
       targetSetting.startContentEnabled = sourceSetting.startContentEnabled;
       targetSetting.startContentLimit = sourceSetting.startContentLimit;
       targetSetting.autoDeleteEnabled = sourceSetting.autoDeleteEnabled;
