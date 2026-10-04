@@ -79,7 +79,7 @@ export async function startHandler(ctx) {
       // 0. Content Sequence Deep Link Router (c_XX)
       if (payload.startsWith('c_')) {
         const { ContentSequence } = await import('../../models/ContentSequence.js');
-        const sequence = await ContentSequence.findOne({ botId, publicCode: payload });
+        const sequence = (await ContentSequence.findOne({ botId, publicCode: payload })) || (await ContentSequence.findOne({ publicCode: payload }));
 
         if (!sequence || sequence.status !== 'ACTIVE') {
           return ctx.reply('Invalid or expired link.').catch(() => {});
@@ -308,9 +308,9 @@ export async function startHandler(ctx) {
         
         let pack = null;
         if (mongoose.Types.ObjectId.isValid(lookupCode)) {
-          pack = await ContentPack.findOne({ _id: lookupCode, botId });
+          pack = (await ContentPack.findOne({ _id: lookupCode, botId })) || (await ContentPack.findById(lookupCode));
         } else {
-          pack = await ContentPack.findOne({ publicCode: lookupCode, botId });
+          pack = (await ContentPack.findOne({ publicCode: lookupCode, botId })) || (await ContentPack.findOne({ publicCode: lookupCode }));
         }
 
         const isExpired = pack && pack.expiresAt && new Date() > new Date(pack.expiresAt);

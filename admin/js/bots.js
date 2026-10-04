@@ -153,7 +153,7 @@ async function loadBotsPool() {
 
         const transfer = await Confirm.show({
           title: `Activate "${name}"?`,
-          message: `Activate "${name}" as your live Telegram bot?\n\nThis will TRANSFER ALL PLATFORM DATA (Categories, Media, Content Packs, Links, Users & Settings) from your previous bot to "${name}" so everything works seamlessly.`,
+          message: `Activate "${name}" as your live Telegram bot?\n\nThis will TRANSFER ALL PLATFORM DATA (Categories, Media, Content Packs, Links & Settings) to "${name}" so everything works seamlessly. (User accounts remain safe and separate for each bot).`,
           confirmText: 'Activate & Transfer Data',
           cancelText: 'Cancel',
           type: 'warning'
@@ -193,7 +193,7 @@ async function loadBotsPool() {
 
         const confirmed = await Confirm.show({
           title: `Transfer Data to "${name}"?`,
-          message: `Are you sure you want to TRANSFER ALL DATA (Categories, Media, Packs, Links, Users & Settings) from other bots into "${name}" and activate it?`,
+          message: `Are you sure you want to TRANSFER ALL DATA (Categories, Media, Packs, Links & Settings) from other bots into "${name}" and activate it? (User accounts remain safe and separate for each bot).`,
           confirmText: 'Transfer & Activate',
           cancelText: 'Cancel',
           type: 'warning'
@@ -284,7 +284,7 @@ document.getElementById('botTokenForm').addEventListener('submit', async (e) => 
       // Offer immediate activation & transfer
       const wantActivate = await Confirm.show({
         title: `Activate @${res.bot.username}?`,
-        message: `Bot @${res.bot.username} is verified! Do you want to ACTIVATE it now and TRANSFER all platform data (categories, media, links, users) to it immediately?`,
+        message: `Bot @${res.bot.username} is verified! Do you want to ACTIVATE it now and TRANSFER all platform data (categories, media, packs, links & settings) to it immediately? (User accounts remain safe and separate for each bot).`,
         confirmText: 'Activate & Transfer Data',
         cancelText: 'Keep in Pool (Activate Later)',
         type: 'warning'
