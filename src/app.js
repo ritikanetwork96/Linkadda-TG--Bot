@@ -38,7 +38,7 @@ app.use(helmet({
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:", "https://*.filebase.com", "https://*.filebase.io", "https://*.amazonaws.com"],
       mediaSrc: ["'self'", "blob:", "https://*.filebase.com", "https://*.filebase.io", "https://*.amazonaws.com"],
-      connectSrc: ["'self'", "http://localhost:*", "http://127.0.0.1:*"],
+      connectSrc: ["'self'", "https://cdn.jsdelivr.net", "https://*.onrender.com", "http://localhost:*", "http://127.0.0.1:*"],
       objectSrc: ["'none'"],
       upgradeInsecureRequests: [],
     },

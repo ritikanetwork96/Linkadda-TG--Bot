@@ -2643,7 +2643,12 @@ router.get('/system/demo-status', authMiddleware, activeBotMiddleware, async (re
   try {
     const botId = req.botId;
     if (!botId) {
-      return res.status(400).json({ status: 'error', message: 'No active bot selected.' });
+      // In global view, check if ANY demo data exists across all bots
+      const hasDemoPack = await ContentPack.exists({ isDemo: true });
+      const hasDemoCategory = await Category.exists({ isDemo: true });
+      const hasDemoContent = await Content.exists({ isDemo: true });
+      const loaded = !!(hasDemoPack || hasDemoCategory || hasDemoContent);
+      return res.json({ status: 'success', loaded, isGlobal: true });
     }
     const hasDemoPack = await ContentPack.exists({ botId, isDemo: true });
     const hasDemoCategory = await Category.exists({ botId, isDemo: true });
