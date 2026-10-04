@@ -1,4 +1,6 @@
 import { API } from './api.js';
+import { Toast } from './toast.js';
+import { Confirm } from './confirm.js';
 
 // Helper to escape HTML characters safely
 function escapeHTML(str) {
@@ -127,15 +129,18 @@ async function loadBotsPool() {
         btn.textContent = 'Testing...';
         try {
           const res = await API.post(`/bots/${id}/test`);
-          btn.disabled = false;
-          btn.textContent = 'Test Connection';
-          alert(res.message || 'Verification complete.');
+          if (res.status === 'success') {
+            Toast.success('Connection Verified', res.message || 'Verification complete.');
+          } else {
+            Toast.error('Connection Failed', res.message || 'Verification failed.');
+          }
           await loadBotsPool();
           await populateGlobalBotSwitcher();
         } catch (err) {
+          Toast.error('Connection Error', 'Failed to connect to Telegram API.');
+        } finally {
           btn.disabled = false;
           btn.textContent = 'Test Connection';
-          alert('Failed to connect to Telegram API.');
         }
       });
     });
@@ -146,43 +151,33 @@ async function loadBotsPool() {
         const id = btn.getAttribute('data-id');
         const name = btn.getAttribute('data-name') || 'this bot';
 
-        const transfer = confirm(
-          `Activate "${name}" as your active bot?\n\n` +
-          `Do you want to TRANSFER ALL DATA (Categories, Media, Products/Packs, Links, Users & Settings) from the previous bot to "${name}"?\n\n` +
-          `• Click [OK] to ACTIVATE and TRANSFER ALL DATA seamlessly.\n` +
-          `• Click [Cancel] if you only want to switch listener without transferring old assets.`
-        );
+        const transfer = await Confirm.show({
+          title: `Activate "${name}"?`,
+          message: `Activate "${name}" as your live Telegram bot?\n\nThis will TRANSFER ALL PLATFORM DATA (Categories, Media, Content Packs, Links, Users & Settings) from your previous bot to "${name}" so everything works seamlessly.`,
+          confirmText: 'Activate & Transfer Data',
+          cancelText: 'Cancel',
+          type: 'warning'
+        });
 
-        let transferData = true;
-        if (!transfer) {
-          const proceedWithoutTransfer = confirm(`Do you want to switch listener to "${name}" without transferring previous data?`);
-          if (!proceedWithoutTransfer) return;
-          transferData = false;
-        }
+        if (!transfer) return;
 
         btn.disabled = true;
         btn.textContent = 'Activating...';
 
         try {
-          const res = await API.patch(`/bots/${id}/activate`, { transferData });
+          const res = await API.patch(`/bots/${id}/activate`, { transferData: true });
           if (res.status === 'success') {
-            let msg = res.message || 'Bot listener activated successfully!';
-            if (res.migrationStats) {
-              const m = res.migrationStats;
-              msg += `\n\nData Transfer Summary:\n• ${m.categories} Categories\n• ${m.content} Media Files\n• ${m.contentPacks} Content Packs\n• ${m.links} Links\n• ${m.users} Users`;
-            }
-            alert(msg);
-
-            // Automatically set active switcher to this new bot
+            const m = res.migrationStats || {};
+            Toast.success('Bot Activated & Data Transferred', `Live listener switched to @${res.botInfo?.username || name}!`);
             localStorage.setItem('admin_active_bot_id', id);
             await loadBotsPool();
             await populateGlobalBotSwitcher();
             reloadActiveTab();
           } else {
-            alert(res.message || 'Failed to activate bot.');
+            Toast.error('Activation Failed', res.message || 'Failed to activate bot.');
           }
         } catch (err) {
-          alert('Failed to activate bot token.');
+          Toast.error('Activation Error', 'Failed to activate bot token.');
         } finally {
           btn.disabled = false;
           btn.textContent = 'Activate';
@@ -196,27 +191,35 @@ async function loadBotsPool() {
         const id = btn.getAttribute('data-id');
         const name = btn.getAttribute('data-name') || 'this bot';
 
-        if (confirm(`Are you sure you want to TRANSFER ALL DATA (Categories, Media, Products/Packs, Links, Users & Settings) from other bots into "${name}"?`)) {
-          btn.disabled = true;
-          btn.textContent = 'Transferring...';
-          try {
-            const res = await API.post(`/bots/${id}/migrate-data`, {});
-            if (res.status === 'success') {
-              const m = res.migrationStats || {};
-              alert(`Migration Complete!\n\nTransferred to "${name}":\n• ${m.categories || 0} Categories\n• ${m.content || 0} Media Files\n• ${m.contentPacks || 0} Content Packs\n• ${m.links || 0} Links\n• ${m.users || 0} Users`);
-              localStorage.setItem('admin_active_bot_id', id);
-              await loadBotsPool();
-              await populateGlobalBotSwitcher();
-              reloadActiveTab();
-            } else {
-              alert(res.message || 'Data migration failed.');
-            }
-          } catch (err) {
-            alert('Data migration failed.');
-          } finally {
-            btn.disabled = false;
-            btn.textContent = '🔄 Transfer Data';
+        const confirmed = await Confirm.show({
+          title: `Transfer Data to "${name}"?`,
+          message: `Are you sure you want to TRANSFER ALL DATA (Categories, Media, Packs, Links, Users & Settings) from other bots into "${name}" and activate it?`,
+          confirmText: 'Transfer & Activate',
+          cancelText: 'Cancel',
+          type: 'warning'
+        });
+
+        if (!confirmed) return;
+
+        btn.disabled = true;
+        btn.textContent = 'Transferring...';
+        try {
+          const res = await API.post(`/bots/${id}/migrate-data`, {});
+          if (res.status === 'success') {
+            const m = res.migrationStats || {};
+            Toast.success('Data Transferred', `Transferred ${m.categories || 0} Categories, ${m.content || 0} Media, ${m.links || 0} Links to "${name}"!`);
+            localStorage.setItem('admin_active_bot_id', id);
+            await loadBotsPool();
+            await populateGlobalBotSwitcher();
+            reloadActiveTab();
+          } else {
+            Toast.error('Transfer Failed', res.message || 'Data migration failed.');
           }
+        } catch (err) {
+          Toast.error('Transfer Error', 'Data migration failed.');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = '🔄 Transfer Data';
         }
       });
     });
@@ -225,20 +228,28 @@ async function loadBotsPool() {
     document.querySelectorAll('.delete-bot-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
-        if (confirm('Are you sure you want to delete this bot configuration?')) {
-          try {
-            const res = await API.delete(`/bots/${id}`);
-            if (res.status === 'success') {
-              alert('Bot configuration deleted successfully!');
-              await loadBotsPool();
-              await populateGlobalBotSwitcher();
-              reloadActiveTab();
-            } else {
-              alert(res.message || 'Failed to delete bot config.');
-            }
-          } catch (err) {
-            alert('Delete execution failed.');
+        const confirmed = await Confirm.show({
+          title: 'Delete Bot?',
+          message: 'Are you sure you want to delete this bot configuration from the pool?',
+          confirmText: 'Delete',
+          cancelText: 'Cancel',
+          type: 'danger'
+        });
+
+        if (!confirmed) return;
+
+        try {
+          const res = await API.delete(`/bots/${id}`);
+          if (res.status === 'success') {
+            Toast.success('Deleted', 'Bot configuration deleted successfully!');
+            await loadBotsPool();
+            await populateGlobalBotSwitcher();
+            reloadActiveTab();
+          } else {
+            Toast.error('Delete Failed', res.message || 'Failed to delete bot config.');
           }
+        } catch (err) {
+          Toast.error('Error', 'Delete execution failed.');
         }
       });
     });
@@ -264,24 +275,42 @@ document.getElementById('botTokenForm').addEventListener('submit', async (e) => 
   try {
     const res = await API.post('/bots', { displayName, token });
     if (res.status === 'success' && res.bot) {
-      alert(`Bot registered successfully! Testing connection with @${res.bot.username}...`);
-      
-      // Auto test connection
-      try {
-        const testRes = await API.post(`/bots/${res.bot._id}/test`);
-        alert(testRes.message || 'Verified successfully.');
-      } catch (testErr) {
-        console.warn('Auto test error:', testErr);
-      }
+      Toast.success('Bot Registered', `@${res.bot.username} verified with Telegram!`);
       
       document.getElementById('botTokenForm').reset();
       await loadBotsPool();
       await populateGlobalBotSwitcher();
+
+      // Offer immediate activation & transfer
+      const wantActivate = await Confirm.show({
+        title: `Activate @${res.bot.username}?`,
+        message: `Bot @${res.bot.username} is verified! Do you want to ACTIVATE it now and TRANSFER all platform data (categories, media, links, users) to it immediately?`,
+        confirmText: 'Activate & Transfer Data',
+        cancelText: 'Keep in Pool (Activate Later)',
+        type: 'warning'
+      });
+
+      if (wantActivate) {
+        try {
+          const actRes = await API.patch(`/bots/${res.bot._id}/activate`, { transferData: true });
+          if (actRes.status === 'success') {
+            Toast.success('Bot Activated', `Now actively polling @${res.bot.username} with all data transferred!`);
+            localStorage.setItem('admin_active_bot_id', res.bot._id);
+            await loadBotsPool();
+            await populateGlobalBotSwitcher();
+            reloadActiveTab();
+          } else {
+            Toast.error('Activation Failed', actRes.message || 'Could not activate bot.');
+          }
+        } catch (actErr) {
+          Toast.error('Activation Error', 'Failed to activate bot.');
+        }
+      }
     } else {
-      alert(res.message || 'Failed to register bot.');
+      Toast.error('Registration Failed', res.message || 'Failed to register bot.');
     }
   } catch (err) {
-    alert('Failed to register bot token.');
+    Toast.error('Error', err.message || 'Failed to register bot token.');
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Save & Verify Bot';
