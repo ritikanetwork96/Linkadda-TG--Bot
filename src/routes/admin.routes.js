@@ -1410,7 +1410,6 @@ router.get('/users', authMiddleware, activeBotMiddleware, async (req, res, next)
     const limit = Math.max(1, Math.min(cleanQueryInt(req.query.limit, 25), 100)); // Hard capped at 100
 
     let query = {};
-    let isShowingAllDueToNewBot = false;
     let activeBotInfo = null;
 
     if (req.botId && !req.isGlobalView) {
@@ -1418,13 +1417,7 @@ router.get('/users', authMiddleware, activeBotMiddleware, async (req, res, next)
       if (activeBotDoc) {
         activeBotInfo = { id: activeBotDoc._id, username: activeBotDoc.username, firstName: activeBotDoc.firstName };
       }
-      const botUserCount = await User.countDocuments({ botId: req.botId });
-      if (botUserCount > 0) {
-        query.botId = req.botId;
-      } else {
-        // Active bot has 0 users yet (brand new bot) -> gracefully show existing platform users so data never vanishes
-        isShowingAllDueToNewBot = true;
-      }
+      query.botId = req.botId;
     }
 
     if (cleanStatus && cleanStatus !== 'all') query.status = cleanStatus;
@@ -1454,7 +1447,7 @@ router.get('/users', authMiddleware, activeBotMiddleware, async (req, res, next)
     return res.json({
       status: 'success',
       users,
-      isFallback: isShowingAllDueToNewBot,
+      isFallback: false,
       activeBot: activeBotInfo,
       pagination: {
         total,

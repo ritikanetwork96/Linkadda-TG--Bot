@@ -195,26 +195,12 @@ export async function migrateBotData(fromBotId, toBotId, options = {}) {
     logger.error('BotMigration: Error migrating Settings:', err.message);
   }
 
-  // 8. Migrate Users (Safe deduplication by telegramUserId)
+  // 8. Users are kept independent per bot so previous bot user history is NEVER deleted.
+  // Each bot maintains its own distinct audience that interacts with it.
   try {
-    const usersToMigrate = await User.find({ botId: sourceBotQuery });
-    for (const u of usersToMigrate) {
-      const existingUser = await User.findOne({ botId: targetObjectId, telegramUserId: u.telegramUserId });
-      if (existingUser) {
-        // User already exists on new bot: keep latest active time and delete duplicate old doc
-        if (u.lastActiveAt && (!existingUser.lastActiveAt || u.lastActiveAt > existingUser.lastActiveAt)) {
-          existingUser.lastActiveAt = u.lastActiveAt;
-          await existingUser.save();
-        }
-        await User.deleteOne({ _id: u._id });
-      } else {
-        u.botId = targetObjectId;
-        await u.save();
-        stats.users++;
-      }
-    }
+    stats.users = await User.countDocuments({ botId: targetObjectId });
   } catch (err) {
-    logger.error('BotMigration: Error migrating Users:', err.message);
+    logger.error('BotMigration: Error reading User stats:', err.message);
   }
 
   // 9. Migrate MediaBundles, DeliveryBatches, Broadcasts
