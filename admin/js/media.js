@@ -1,5 +1,6 @@
 import { API } from './api.js';
 import { Toast } from './toast.js';
+import { Confirm } from './confirm.js';
 
 let currentMediaPage = 1;
 let totalMediaPages = 1;
@@ -108,7 +109,13 @@ function renderMediaGallery(items) {
       const id = btn.getAttribute('data-id');
       const title = btn.getAttribute('data-title') || 'this file';
 
-      if (!confirm(`⚠️ Delete "${title}" permanently?\n\nThis will remove it from MongoDB AND Filebase S3 storage. Any links using this file may break.`)) return;
+      const confirmed = await Confirm.show({
+        title: 'Delete Media File?',
+        message: `Permanently delete "${title}"? This will remove it from MongoDB and S3 Filebase storage.`,
+        confirmText: 'Delete Permanently',
+        type: 'danger'
+      });
+      if (!confirmed) return;
 
       btn.disabled = true;
       btn.textContent = 'Deleting...';

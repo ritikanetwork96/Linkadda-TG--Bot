@@ -11,26 +11,78 @@
   <link rel="stylesheet" href="css/components.css?v=5.2">
   <link rel="stylesheet" href="css/media.css?v=5.2">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+  <script>
+    // Early synchronous modal helper available before deferred module scripts execute
+    window.openModal = function(modalId) {
+      const el = document.getElementById('modal-' + modalId);
+      if (!el) return;
+      el.classList.add('active');
+      document.body.style.overflow = 'hidden';
+      document.body.classList.add('modal-open');
+      const firstInput = el.querySelector('input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])');
+      if (firstInput) setTimeout(() => firstInput.focus(), 60);
+    };
+
+    window.closeModal = function(modalId) {
+      if (!modalId) {
+        const active = document.querySelectorAll('.modal-backdrop.active');
+        if (active.length > 0) modalId = active[active.length - 1].id.replace('modal-', '');
+        else return;
+      }
+      const el = document.getElementById('modal-' + modalId);
+      if (!el) return;
+      el.classList.remove('active');
+      if (el._focusTrap) {
+        try { el.removeEventListener('keydown', el._focusTrap); } catch(e) {}
+        delete el._focusTrap;
+      }
+      delete el._initialState;
+      if (!document.querySelector('.modal-backdrop.active')) {
+        document.body.style.overflow = '';
+        document.body.classList.remove('modal-open');
+      }
+    };
+
+    // Capture click listener: instant handling of modal close [X] and Cancel clicks
+    document.addEventListener('click', function(e) {
+      const closeBtn = e.target.closest('.modal-close, [data-close-modal], [data-dismiss="modal"]');
+      if (closeBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const explicitId = closeBtn.getAttribute('data-close-modal');
+        if (explicitId) {
+          window.closeModal(explicitId);
+          return;
+        }
+        const backdrop = closeBtn.closest('.modal-backdrop');
+        if (backdrop) {
+          window.closeModal(backdrop.id.replace('modal-', ''));
+          return;
+        }
+        window.closeModal();
+        return;
+      }
+
+      if (e.target.classList.contains('modal-backdrop') && e.target.classList.contains('active')) {
+        if (e.target.id === 'modal-confirm') return;
+        window.closeModal(e.target.id.replace('modal-', ''));
+      }
+    }, true);
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        const active = document.querySelectorAll('.modal-backdrop.active');
+        if (active.length > 0) {
+          window.closeModal(active[active.length - 1].id.replace('modal-', ''));
+        }
+      }
+    });
+  </script>
 </head>
 <body>
 
   <!-- Toast Container -->
   <div id="toast-container" role="region" aria-label="Notifications" aria-live="polite"></div>
-
-  <!-- Universal Confirm Modal -->
-  <div id="modal-confirm" class="modal-backdrop">
-    <div class="modal modal-sm">
-      <div class="modal-body" style="text-align:center;padding:1.5rem 1.25rem">
-        <div class="confirm-icon danger">🗑</div>
-        <div class="confirm-title" style="font-weight:700;font-size:0.95rem;color:var(--text);margin-bottom:0.5rem">Are you sure?</div>
-        <div class="confirm-message"></div>
-      </div>
-      <div class="modal-footer">
-        <button id="confirm-cancel-btn" class="btn btn-secondary">Cancel</button>
-        <button id="confirm-ok-btn" class="btn btn-danger">Confirm</button>
-      </div>
-    </div>
-  </div>
 
   <!-- Ambient Glow Backgrounds -->
   <div class="bg-ambient"></div>
@@ -1104,7 +1156,7 @@
     <div class="modal">
       <div class="modal-header">
         <h3 id="modal-category-title">Create Category</h3>
-        <button class="modal-close" onclick="closeModal('category')">&times;</button>
+        <button type="button" class="modal-close" data-close-modal="category" aria-label="Close">&times;</button>
       </div>
       <form id="categoryForm">
         <input type="hidden" id="category-id">
@@ -1149,7 +1201,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('category')">Cancel</button>
+          <button type="button" class="btn btn-secondary" data-close-modal="category" onclick="closeModal('category')">Cancel</button>
           <button type="submit" class="btn btn-primary">Save Changes</button>
         </div>
       </form>
@@ -1163,7 +1215,7 @@
     <div class="modal">
       <div class="modal-header">
         <h3 id="modal-content-title">Add Content</h3>
-        <button class="modal-close" onclick="closeModal('content-editor')">&times;</button>
+        <button type="button" class="modal-close" data-close-modal="content-editor" aria-label="Close">&times;</button>
       </div>
       <form id="contentForm">
         <input type="hidden" id="content-id">
@@ -1247,7 +1299,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('content-editor')">Cancel</button>
+          <button type="button" class="btn btn-secondary" data-close-modal="content-editor" onclick="closeModal('content-editor')">Cancel</button>
           <button type="submit" class="btn btn-primary" id="btn-save-content">Save Content</button>
         </div>
       </form>
@@ -1261,7 +1313,7 @@
     <div class="modal">
       <div class="modal-header">
         <h3>Bulk Media Upload Manager</h3>
-        <button class="modal-close" onclick="closeModal('bulk-upload')">&times;</button>
+        <button type="button" class="modal-close" data-close-modal="bulk-upload" aria-label="Close">&times;</button>
       </div>
       <form id="bulkUploadForm">
         <div class="modal-body" style="max-height: 480px; overflow-y: auto;">
@@ -1321,7 +1373,7 @@
         </div>
         
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('bulk-upload')">Cancel</button>
+          <button type="button" class="btn btn-secondary" data-close-modal="bulk-upload" onclick="closeModal('bulk-upload')">Cancel</button>
           <button type="submit" class="btn btn-primary" id="btn-start-bulk-upload">Start Upload Queue</button>
         </div>
       </form>
@@ -1335,7 +1387,7 @@
     <div class="modal">
       <div class="modal-header">
         <h3>Create Broadcast</h3>
-        <button class="modal-close" onclick="closeModal('broadcast-editor')">&times;</button>
+        <button type="button" class="modal-close" data-close-modal="broadcast-editor" aria-label="Close">&times;</button>
       </div>
       <form id="broadcastForm">
         <div class="modal-body">
@@ -1382,7 +1434,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('broadcast-editor')">Cancel</button>
+          <button type="button" class="btn btn-secondary" data-close-modal="broadcast-editor" onclick="closeModal('broadcast-editor')">Cancel</button>
           <button type="submit" class="btn btn-primary">Dispatch Broadcast</button>
         </div>
       </form>
@@ -1396,7 +1448,7 @@
     <div class="modal">
       <div class="modal-header">
         <h3 id="modal-bot-menu-title">Create Menu Button</h3>
-        <button class="modal-close" onclick="closeModal('bot-menu')">&times;</button>
+        <button type="button" class="modal-close" data-close-modal="bot-menu" aria-label="Close">&times;</button>
       </div>
       <form id="botMenuForm">
         <div class="modal-body">
@@ -1439,7 +1491,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('bot-menu')">Cancel</button>
+          <button type="button" class="btn btn-secondary" data-close-modal="bot-menu" onclick="closeModal('bot-menu')">Cancel</button>
           <button type="submit" class="btn btn-primary">Save Button</button>
         </div>
       </form>
@@ -1453,7 +1505,7 @@
     <div class="modal modal-lg" style="max-width:850px">
       <div class="modal-header">
         <h3 id="modal-pack-title">Create Content Pack</h3>
-        <button class="modal-close" onclick="closeModal('pack-editor')">&times;</button>
+        <button type="button" class="modal-close" data-close-modal="pack-editor" aria-label="Close">&times;</button>
       </div>
       <form id="packForm">
         <input type="hidden" id="pack-id">
@@ -1523,7 +1575,7 @@
 
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('pack-editor')">Cancel</button>
+          <button type="button" class="btn btn-secondary" data-close-modal="pack-editor" onclick="closeModal('pack-editor')">Cancel</button>
           <button type="submit" class="btn btn-primary" id="btn-save-pack">Save Pack</button>
         </div>
       </form>
@@ -1537,7 +1589,7 @@
     <div class="modal" style="max-width:700px; margin-top:2rem">
       <div class="modal-header">
         <h3>Select Content Items</h3>
-        <button type="button" class="modal-close" onclick="closeModal('content-selector')">&times;</button>
+        <button type="button" class="modal-close" data-close-modal="content-selector" aria-label="Close">&times;</button>
       </div>
       <div class="modal-body" style="max-height: calc(100vh - 250px); overflow-y: auto;">
         
@@ -1585,7 +1637,7 @@
 
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('content-selector')">Cancel</button>
+        <button type="button" class="btn btn-secondary" data-close-modal="content-selector" onclick="closeModal('content-selector')">Cancel</button>
         <button type="button" class="btn btn-primary" id="btn-selector-add-selected">Add Selected</button>
       </div>
     </div>
@@ -1598,7 +1650,7 @@
     <div class="modal modal-lg" style="max-width:800px">
       <div class="modal-header">
         <h3 id="modal-preview-pack-title">Pack Details & Analytics</h3>
-        <button class="modal-close" onclick="closeModal('pack-preview')">&times;</button>
+        <button type="button" class="modal-close" data-close-modal="pack-preview" aria-label="Close">&times;</button>
       </div>
       <div class="modal-body" style="max-height: calc(100vh - 200px); overflow-y: auto;">
         
@@ -1659,7 +1711,7 @@
 
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('pack-preview')">Close</button>
+        <button type="button" class="btn btn-secondary" data-close-modal="pack-preview" onclick="closeModal('pack-preview')">Close</button>
       </div>
     </div>
   </div>
@@ -1904,38 +1956,30 @@
       
       el.classList.add('active');
       document.body.style.overflow = 'hidden';
+      document.body.classList.add('modal-open');
       
-      const firstInput = el.querySelector('input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])');
+      const firstInput = el.querySelector('input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])');
       if (firstInput) {
         setTimeout(() => firstInput.focus(), 50);
       }
-      
-      setTimeout(() => {
-        el._initialState = serializeModalInputs(el);
-      }, 100);
       
       el._focusTrap = (e) => trapFocus(e, el);
       el.addEventListener('keydown', el._focusTrap);
     };
 
-    async function closeModal(modalId, force = false) {
+    window.closeModal = function(modalId) {
       try {
-        const el = document.getElementById(`modal-${modalId}`);
-        if (!el) return;
-
-        if (!force && el._initialState) {
-          const currentState = serializeModalInputs(el);
-          if (currentState !== el._initialState) {
-            const discard = await Confirm.show({
-              title: 'Discard Changes?',
-              message: 'You have unsaved changes. Are you sure you want to discard them?',
-              confirmText: 'Discard',
-              cancelText: 'Keep Editing',
-              type: 'warning'
-            });
-            if (!discard) return;
+        if (!modalId) {
+          const activeModals = document.querySelectorAll('.modal-backdrop.active');
+          if (activeModals.length > 0) {
+            modalId = activeModals[activeModals.length - 1].id.replace('modal-', '');
+          } else {
+            return;
           }
         }
+
+        const el = document.getElementById(`modal-${modalId}`);
+        if (!el) return;
 
         el.classList.remove('active');
         
@@ -1946,25 +1990,19 @@
         delete el._initialState;
 
         const anyOpen = document.querySelector('.modal-backdrop.active');
-        if (!anyOpen) document.body.style.overflow = '';
+        if (!anyOpen) {
+          document.body.style.overflow = '';
+          document.body.classList.remove('modal-open');
+        }
         
         if (lastActiveElement) {
-          lastActiveElement.focus();
+          try { lastActiveElement.focus(); } catch(e) {}
           lastActiveElement = null;
         }
       } catch (err) {
-        alert("closeModal Error: " + err.message + "\nStack: " + err.stack);
+        console.error("closeModal Error:", err);
       }
-    }
-    window.closeModal = closeModal;
-
-    document.addEventListener('click', (e) => {
-      if (e.target.classList.contains('modal-backdrop') && e.target.classList.contains('active')) {
-        const modalId = e.target.id.replace('modal-', '');
-        if (modalId === 'confirm') return;
-        closeModal(modalId);
-      }
-    });
+    };
   </script>
 
   <!-- Mobile Bottom Navigation -->

@@ -1,4 +1,6 @@
 import { API } from './api.js';
+import { Toast } from './toast.js';
+import { Confirm } from './confirm.js';
 
 window.addEventListener('load-bot-menus', async () => {
   await loadBotMenus();
@@ -54,18 +56,26 @@ async function loadBotMenus() {
     document.querySelectorAll('.delete-menu-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
-        if (confirm('Are you sure you want to delete this menu button?')) {
-          try {
-            const res = await API.delete(`/bot-menus/${id}`);
-            if (res.status === 'success') {
-              alert('Menu button deleted successfully!');
-              await loadBotMenus();
-            } else {
-              alert(res.message || 'Failed to delete menu button.');
-            }
-          } catch (err) {
-            alert('Failed to delete menu button.');
+        const menu = menus.find(x => x._id === id);
+        const label = menu ? menu.label : 'this menu button';
+        const confirmed = await Confirm.show({
+          title: 'Delete Menu Button?',
+          message: `Are you sure you want to delete "${label}"? Telegram users will no longer see this button in the bot menu.`,
+          confirmText: 'Delete',
+          type: 'danger'
+        });
+        if (!confirmed) return;
+
+        try {
+          const res = await API.delete(`/bot-menus/${id}`);
+          if (res.status === 'success') {
+            Toast.success('Deleted', 'Menu button deleted successfully!');
+            await loadBotMenus();
+          } else {
+            Toast.error('Delete Failed', res.message || 'Failed to delete menu button.');
           }
+        } catch (err) {
+          Toast.error('Delete Failed', 'Failed to delete menu button.');
         }
       });
     });

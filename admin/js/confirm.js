@@ -45,11 +45,16 @@ export const Confirm = {
       // Show modal
       modal.classList.add('active');
       document.body.style.overflow = 'hidden';
+      document.body.classList.add('modal-open');
 
       // Cleanup helper
       const cleanup = (result) => {
         modal.classList.remove('active');
-        document.body.style.overflow = '';
+        const anyOpen = document.querySelector('.modal-backdrop.active');
+        if (!anyOpen) {
+          document.body.style.overflow = '';
+          document.body.classList.remove('modal-open');
+        }
         okBtn.removeEventListener('click', onOk);
         cancelBtn.removeEventListener('click', onCancel);
         document.removeEventListener('keydown', onKey);

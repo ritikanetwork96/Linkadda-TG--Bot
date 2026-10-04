@@ -269,13 +269,28 @@ async function openPackEditor(packId = null) {
   openModal('pack-editor');
 }
 
+function syncSelectedItemsFromDOM() {
+  const tableBody = document.querySelector('#pack-selected-items-table tbody');
+  if (!tableBody) return;
+  const rows = tableBody.querySelectorAll('tr');
+  rows.forEach((row, index) => {
+    if (!selectedItems[index]) return;
+    const captionInput = row.querySelector('.caption-override-input');
+    const modeSelect = row.querySelector('.mode-input');
+    const enabledInput = row.querySelector('.item-enabled-input');
+    if (captionInput) selectedItems[index].captionOverride = captionInput.value;
+    if (modeSelect) selectedItems[index].deliveryMode = modeSelect.value;
+    if (enabledInput) selectedItems[index].enabled = enabledInput.checked;
+  });
+}
+
 // Render selected items list in create/edit form
 function renderSelectedItemsTable() {
   const tableBody = document.querySelector('#pack-selected-items-table tbody');
   if (!tableBody) return;
 
   if (selectedItems.length === 0) {
-    tableBody.innerHTML = `<tr><td colspan="7" class="text-center text-dim" style="padding:1rem">No content items added. Click "Add Content" above to select.</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="7" class="text-center text-dim" style="padding:1.25rem 1rem">No content items added. Click "Add Content" above to select.</td></tr>`;
     return;
   }
 
@@ -286,22 +301,22 @@ function renderSelectedItemsTable() {
         <td style="font-weight:600;font-size:0.82rem;color:var(--text);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHTML(item.title)}">${escapeHTML(item.title)}</td>
         <td><span class="badge badge-neutral" style="font-size:0.7rem">${item.type}</span></td>
         <td>
-          <input type="text" class="form-input caption-override-input" style="padding:0.25rem 0.5rem;font-size:0.75rem;" data-idx="${index}" value="${escapeHTML(item.captionOverride)}" placeholder="override caption...">
+          <input type="text" class="form-input caption-override-input" style="padding:0.35rem 0.5rem;font-size:0.8rem;" data-idx="${index}" value="${escapeHTML(item.captionOverride)}" placeholder="override caption...">
         </td>
         <td>
-          <select class="form-select mode-input" style="padding:0.25rem 1.5rem 0.25rem 0.5rem;font-size:0.75rem;" data-idx="${index}">
+          <select class="form-select mode-input" style="padding:0.35rem 1.5rem 0.35rem 0.5rem;font-size:0.8rem;" data-idx="${index}">
             <option value="normal" ${item.deliveryMode === 'normal' ? 'selected' : ''}>Normal</option>
             <option value="protected" ${item.deliveryMode === 'protected' ? 'selected' : ''}>Protected</option>
           </select>
         </td>
         <td>
-          <input type="checkbox" class="item-enabled-input" data-idx="${index}" ${item.enabled ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer">
+          <input type="checkbox" class="item-enabled-input" data-idx="${index}" ${item.enabled ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer">
         </td>
         <td>
-          <div class="d-flex gap-1">
-            <button type="button" class="btn btn-secondary btn-sm move-up-btn" data-idx="${index}" ${index === 0 ? 'disabled' : ''} style="padding:0.18rem 0.38rem">↑</button>
-            <button type="button" class="btn btn-secondary btn-sm move-down-btn" data-idx="${index}" ${index === selectedItems.length - 1 ? 'disabled' : ''} style="padding:0.18rem 0.38rem">↓</button>
-            <button type="button" class="btn btn-danger btn-sm remove-item-btn" data-idx="${index}" style="padding:0.18rem 0.38rem">✕</button>
+          <div class="d-flex gap-1 align-center">
+            <button type="button" class="btn btn-secondary btn-sm move-up-btn" data-idx="${index}" ${index === 0 ? 'disabled' : ''} style="min-width:32px;min-height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center" title="Move Up">↑</button>
+            <button type="button" class="btn btn-secondary btn-sm move-down-btn" data-idx="${index}" ${index === selectedItems.length - 1 ? 'disabled' : ''} style="min-width:32px;min-height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center" title="Move Down">↓</button>
+            <button type="button" class="btn btn-danger btn-sm remove-item-btn" data-idx="${index}" style="min-width:32px;min-height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem" title="Remove item" aria-label="Remove item">✕</button>
           </div>
         </td>
       </tr>
@@ -312,48 +327,57 @@ function renderSelectedItemsTable() {
   tableBody.querySelectorAll('.caption-override-input').forEach(input => {
     input.addEventListener('change', () => {
       const idx = parseInt(input.dataset.idx, 10);
-      selectedItems[idx].captionOverride = input.value;
+      if (selectedItems[idx]) selectedItems[idx].captionOverride = input.value;
     });
   });
 
   tableBody.querySelectorAll('.mode-input').forEach(select => {
     select.addEventListener('change', () => {
       const idx = parseInt(select.dataset.idx, 10);
-      selectedItems[idx].deliveryMode = select.value;
+      if (selectedItems[idx]) selectedItems[idx].deliveryMode = select.value;
     });
   });
 
   tableBody.querySelectorAll('.item-enabled-input').forEach(cb => {
     cb.addEventListener('change', () => {
       const idx = parseInt(cb.dataset.idx, 10);
-      selectedItems[idx].enabled = cb.checked;
+      if (selectedItems[idx]) selectedItems[idx].enabled = cb.checked;
     });
   });
 
   tableBody.querySelectorAll('.move-up-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
       const idx = parseInt(btn.dataset.idx, 10);
       swapSelectedItems(idx, idx - 1);
     });
   });
 
   tableBody.querySelectorAll('.move-down-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
       const idx = parseInt(btn.dataset.idx, 10);
       swapSelectedItems(idx, idx + 1);
     });
   });
 
   tableBody.querySelectorAll('.remove-item-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      syncSelectedItemsFromDOM();
       const idx = parseInt(btn.dataset.idx, 10);
-      selectedItems.splice(idx, 1);
-      renderSelectedItemsTable();
+      if (!isNaN(idx) && idx >= 0 && idx < selectedItems.length) {
+        selectedItems.splice(idx, 1);
+        renderSelectedItemsTable();
+      }
     });
   });
 }
 
 function swapSelectedItems(a, b) {
+  syncSelectedItemsFromDOM();
+  if (a < 0 || b < 0 || a >= selectedItems.length || b >= selectedItems.length) return;
   [selectedItems[a], selectedItems[b]] = [selectedItems[b], selectedItems[a]];
   renderSelectedItemsTable();
 }
@@ -361,6 +385,7 @@ function swapSelectedItems(a, b) {
 // Form Submission (Create/Edit Save)
 document.getElementById('packForm')?.addEventListener('submit', async (e) => {
   e.preventDefault();
+  syncSelectedItemsFromDOM();
   const packId = document.getElementById('pack-id').value;
   const name = document.getElementById('pack-name-input').value;
   const description = document.getElementById('pack-desc-input').value;
