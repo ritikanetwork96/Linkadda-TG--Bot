@@ -607,6 +607,7 @@
               <th>Created Date</th>
               <th>Link / Token</th>
               <th>Total Items</th>
+              <th>Auto-Delete</th>
               <th>Expires At</th>
               <th>Status</th>
               <th>Actions</th>
@@ -712,11 +713,17 @@
             <div class="form-group mb-4" style="max-width:320px">
               <label for="setting-autodelete-hours">Auto Delete Window</label>
               <select id="setting-autodelete-hours" class="form-select">
-                <option value="1">1 Hour</option>
-                <option value="6">6 Hours</option>
-                <option value="12">12 Hours</option>
-                <option value="24">24 Hours</option>
-                <option value="48">48 Hours</option>
+                <option value="0.01667">⏱️ 1 Minute</option>
+                <option value="0.05">⏱️ 3 Minutes</option>
+                <option value="0.08333">⏱️ 5 Minutes</option>
+                <option value="0.16667">⏱️ 10 Minutes</option>
+                <option value="0.25">⏱️ 15 Minutes</option>
+                <option value="0.5">⏱️ 30 Minutes</option>
+                <option value="1">⏱️ 1 Hour</option>
+                <option value="6">⏱️ 6 Hours</option>
+                <option value="12">⏱️ 12 Hours</option>
+                <option value="24" selected>⏱️ 24 Hours</option>
+                <option value="48">⏱️ 48 Hours</option>
               </select>
             </div>
             <div class="settings-row">

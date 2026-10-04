@@ -1335,10 +1335,9 @@ router.patch('/settings', authMiddleware, activeBotMiddleware, async (req, res, 
     }
     if (autoDeleteEnabled !== undefined) settings.autoDeleteEnabled = autoDeleteEnabled;
     if (autoDeleteHours !== undefined) {
-      const hours = parseInt(autoDeleteHours, 10);
-      const allowedHours = [1, 6, 12, 24, 48];
-      if (!allowedHours.includes(hours)) {
-        return res.status(400).json({ status: 'error', message: 'Auto delete hours must be 1, 6, 12, 24, or 48.' });
+      const hours = parseFloat(autoDeleteHours);
+      if (isNaN(hours) || hours <= 0) {
+        return res.status(400).json({ status: 'error', message: 'Auto delete duration must be a valid positive number.' });
       }
       settings.autoDeleteHours = hours;
     }
@@ -2958,8 +2957,18 @@ router.patch('/links/:token', authMiddleware, activeBotMiddleware, async (req, r
       link.status = status;
     }
 
+    // Update autoDeleteSeconds — null or 'never' or 0 means lifetime (no auto-delete)
+    if (req.body.autoDeleteSeconds !== undefined) {
+      if (req.body.autoDeleteSeconds === null || req.body.autoDeleteSeconds === '' || req.body.autoDeleteSeconds === 'never' || req.body.autoDeleteSeconds === 0) {
+        link.autoDeleteSeconds = null;
+      } else {
+        const secs = parseInt(req.body.autoDeleteSeconds, 10);
+        link.autoDeleteSeconds = isNaN(secs) || secs <= 0 ? null : secs;
+      }
+    }
+
     await link.save();
-    await ActivityLog.log('Link edited', req.admin.id, 'success', { token });
+    await ActivityLog.log('Link edited', req.admin.id, 'success', { token, autoDeleteSeconds: link.autoDeleteSeconds });
 
     return res.json({ status: 'success', message: 'Link updated successfully.', link });
   } catch (error) {
@@ -2990,6 +2999,33 @@ router.delete('/links/:token', authMiddleware, activeBotMiddleware, async (req, 
     return res.json({ status: 'success', message: 'Link deleted successfully.' });
   } catch (error) {
     next(error);
+  }
+});
+
+// POST /system/run-deletion — Trigger auto-delete sweep on demand
+router.post('/system/run-deletion', authMiddleware, async (req, res, next) => {
+  try {
+    const { runDeletionJob } = await import('../scheduler/deletion.scheduler.js');
+    await runDeletionJob();
+
+    const { Delivery } = await import('../models/Delivery.js');
+    const now = new Date();
+    const pendingCount = await Delivery.countDocuments({
+      status: 'sent',
+      deleteAt: { $exists: true, $ne: null, $gt: now }
+    });
+    const deletedCount = await Delivery.countDocuments({ status: 'deleted' });
+
+    res.json({
+      status: 'success',
+      message: 'Auto-delete sweep executed successfully.',
+      queue: {
+        pendingDeliveries: pendingCount,
+        totalDeleted: deletedCount
+      }
+    });
+  } catch (err) {
+    next(err);
   }
 });
 

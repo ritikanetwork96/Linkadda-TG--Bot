@@ -413,18 +413,69 @@ export const telegramService = {
     return telegram.sendMessage(chatId, text);
   },
 
+  // Cache of Telegram API client instances per botId
+  botClients: new Map(),
+
+  async getClientForBot(botId = null) {
+    if (!botId) {
+      return this.client;
+    }
+    const botIdStr = botId.toString();
+    if (this.botClients.has(botIdStr)) {
+      return this.botClients.get(botIdStr);
+    }
+
+    try {
+      const { Bot: BotModel } = await import('../models/Bot.js');
+      const { decrypt } = await import('../utils/crypto.js');
+      const botDoc = await BotModel.findById(botId);
+      if (botDoc && botDoc.encryptedToken) {
+        const token = decrypt(botDoc.encryptedToken);
+        if (token) {
+          const client = new Telegram(token);
+          this.botClients.set(botIdStr, client);
+          return client;
+        }
+      }
+    } catch (err) {
+      console.warn(`TelegramService: Could not resolve client for botId ${botId}:`, err.message);
+    }
+    return this.client;
+  },
+
   /**
    * Deletes a message from Telegram
    * @param {number} chatId 
    * @param {number} messageId 
+   * @param {string|null} [botId] - Bot ID associated with delivery
    * @returns {Promise<boolean>}
    */
-  async deleteMessage(chatId, messageId) {
+  async deleteMessage(chatId, messageId, botId = null) {
+    const client = await this.getClientForBot(botId);
     try {
-      await telegram.deleteMessage(chatId, messageId);
+      await client.deleteMessage(chatId, messageId);
       return true;
     } catch (error) {
-      console.error(`Telegram: deleteMessage failed for chat ${chatId}, message ${messageId}: ${error.message}`);
+      const msg = error.message || '';
+      // If message is already deleted or not found, it's considered successfully removed
+      if (msg.includes('message to delete not found') || msg.includes("message can't be deleted") || msg.includes('MESSAGE_ID_INVALID')) {
+        return true;
+      }
+
+      // If client was a custom bot client and failed, try active client as fallback
+      if (client !== this.client) {
+        try {
+          await this.client.deleteMessage(chatId, messageId);
+          return true;
+        } catch (fbErr) {
+          const fbMsg = fbErr.message || '';
+          if (fbMsg.includes('message to delete not found') || fbMsg.includes("message can't be deleted")) {
+            return true;
+          }
+        }
+      }
+
+      console.error(`Telegram: deleteMessage failed for chat ${chatId}, message ${messageId} (bot: ${botId || 'active'}): ${msg}`);
       throw error;
     }
   }

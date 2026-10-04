@@ -24,7 +24,27 @@ async function loadSettings() {
     setVal('setting-welcome',          s.welcomeMessage);
     setVal('setting-bot-description',  s.botDescription);
     setVal('setting-bot-short-description', s.botShortDescription);
-    setVal('setting-autodelete-hours', s.autoDeleteHours);
+
+    const adSelect = document.getElementById('setting-autodelete-hours');
+    if (adSelect && s.autoDeleteHours !== undefined && s.autoDeleteHours !== null) {
+      const val = parseFloat(s.autoDeleteHours);
+      let matched = false;
+      for (const opt of adSelect.options) {
+        if (Math.abs(parseFloat(opt.value) - val) < 0.005) {
+          adSelect.value = opt.value;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched && !isNaN(val)) {
+        const newOpt = document.createElement('option');
+        newOpt.value = val;
+        newOpt.textContent = val < 1 ? `⏱️ ${Math.round(val * 60)} Minutes` : `⏱️ ${val} Hours`;
+        adSelect.appendChild(newOpt);
+        adSelect.value = val;
+      }
+    }
+
     setCheck('setting-autodelete-enabled', s.autoDeleteEnabled);
     setCheck('setting-bot-enabled',      s.botEnabled);
 
@@ -106,7 +126,7 @@ document.getElementById('settingsForm')?.addEventListener('submit', async (e) =>
       welcomeMessage:      document.getElementById('setting-welcome')?.value.trim(),
       botDescription:      document.getElementById('setting-bot-description')?.value.trim(),
       botShortDescription: document.getElementById('setting-bot-short-description')?.value.trim(),
-      autoDeleteHours:     parseInt(document.getElementById('setting-autodelete-hours')?.value, 10),
+      autoDeleteHours:     parseFloat(document.getElementById('setting-autodelete-hours')?.value),
       autoDeleteEnabled:   document.getElementById('setting-autodelete-enabled')?.checked,
       botEnabled:          document.getElementById('setting-bot-enabled')?.checked,
     };

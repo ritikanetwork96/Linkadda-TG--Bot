@@ -160,8 +160,8 @@ export async function startHandler(ctx) {
           const batchId = new mongoose.Types.ObjectId().toString();
           
           let deleteAt = null;
-          if (link.autoDeleteSeconds !== undefined && link.autoDeleteSeconds !== null) {
-            deleteAt = new Date(Date.now() + link.autoDeleteSeconds * 1000);
+          if (link.autoDeleteSeconds !== undefined && link.autoDeleteSeconds !== null && Number(link.autoDeleteSeconds) > 0) {
+            deleteAt = new Date(Date.now() + Number(link.autoDeleteSeconds) * 1000);
           }
 
           // Sort items by sortOrder

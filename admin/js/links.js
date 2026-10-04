@@ -59,7 +59,17 @@ async function loadLinksList() {
       if (link.status === 'expired') statusColor = 'badge-danger';
       const toggleActionLabel = link.status === 'active' ? 'Deactivate' : 'Activate';
       const toggleActionClass = link.status === 'active' ? 'btn-warning' : 'btn-success';
-      const linkDataAttr = encodeURIComponent(JSON.stringify({ token: link.token, status: link.status, expiresAt: link.expiresAt || null, shareLink: link.shareLink || '' }));
+
+      let autoDeleteBadge = '<span class="badge badge-success" style="font-size:0.75rem">🟢 Lifetime</span>';
+      if (link.autoDeleteSeconds && link.autoDeleteSeconds > 0) {
+        const secs = link.autoDeleteSeconds;
+        let timeStr = `${secs}s`;
+        if (secs < 60) timeStr = `${secs} sec${secs > 1 ? 's' : ''}`;
+        else if (secs < 3600) timeStr = `${Math.round(secs / 60)} min${Math.round(secs / 60) > 1 ? 's' : ''}`;
+        else if (secs < 86400) timeStr = `${Math.round(secs / 3600)} hr${Math.round(secs / 3600) > 1 ? 's' : ''}`;
+        else timeStr = `${Math.round(secs / 86400)} day${Math.round(secs / 86400) > 1 ? 's' : ''}`;
+        autoDeleteBadge = `<span class="badge badge-warning" style="font-size:0.75rem">⏱️ ${timeStr}</span>`;
+      }
 
       return `<tr>
         <td>${createdTime}</td>
@@ -68,10 +78,12 @@ async function loadLinksList() {
           <div style="font-size:0.75rem;color:var(--text-dim);margin-top:0.25rem">Token: <code>${link.token}</code></div>
         </td>
         <td><span class="badge badge-info">${link.items ? link.items.length : 0} items</span></td>
+        <td>${autoDeleteBadge}</td>
         <td><div style="font-size:0.8rem">Link: <span class="text-muted">${expiresTime}</span></div></td>
         <td><span class="badge ${statusColor}">${link.status.toUpperCase()}</span></td>
         <td>
           <div class="d-flex gap-2" style="flex-wrap:wrap">
+            <button class="btn btn-sm btn-primary edit-link-btn" data-token="${link.token}">✏️ Edit</button>
             <button class="btn btn-sm ${toggleActionClass} toggle-link-btn" data-token="${link.token}" data-status="${link.status}">${toggleActionLabel}</button>
             <button class="btn btn-danger btn-sm delete-link-btn" data-token="${link.token}">Delete</button>
           </div>
@@ -79,6 +91,13 @@ async function loadLinksList() {
       </tr>`;
     }).join('');
 
+    tableBody.querySelectorAll('.edit-link-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const token = btn.getAttribute('data-token');
+        const found = links.find(l => l.token === token);
+        if (found) openEditLinkModal(found);
+      });
+    });
     tableBody.querySelectorAll('.toggle-link-btn').forEach(btn => {
       btn.addEventListener('click', () => toggleLinkStatus(btn.getAttribute('data-token'), btn.getAttribute('data-status')));
     });
@@ -152,8 +171,29 @@ function ensureEditModal() {
           <option value="inactive">Inactive</option>
         </select>
       </div>
+      <div style="margin-bottom:1rem">
+        <label for="edit-link-autodelete" style="font-size:0.75rem;color:var(--text-dim,#9ca3af);font-weight:500;display:block;margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:0.05em">Message Auto-Delete (Delivery Expiry)</label>
+        <select id="edit-link-autodelete" style="width:100%;background:var(--surface-2,#1e2738);border:1px solid rgba(255,255,255,0.12);border-radius:0.6rem;padding:0.65rem 0.875rem;color:var(--text,#f3f4f6);font-size:0.9rem;outline:none;cursor:pointer;">
+          <option value="never">🟢 Lifetime / Never (No auto-delete)</option>
+          <option value="60">⏱️ 1 Minute</option>
+          <option value="180">⏱️ 3 Minutes</option>
+          <option value="300">⏱️ 5 Minutes</option>
+          <option value="600">⏱️ 10 Minutes</option>
+          <option value="900">⏱️ 15 Minutes</option>
+          <option value="1800">⏱️ 30 Minutes</option>
+          <option value="3600">⏱️ 1 Hour</option>
+          <option value="21600">⏱️ 6 Hours</option>
+          <option value="43200">⏱️ 12 Hours</option>
+          <option value="86400">⏱️ 24 Hours</option>
+          <option value="172800">⏱️ 48 Hours</option>
+          <option value="custom">⏱️ Custom Seconds...</option>
+        </select>
+        <div id="edit-link-custom-autodelete-wrap" style="display:none;margin-top:0.5rem">
+          <input type="number" id="edit-link-custom-autodelete" placeholder="Enter seconds (e.g. 240 for 4 mins)" min="10" style="width:100%;background:var(--surface-2,#1e2738);border:1px solid rgba(255,255,255,0.12);border-radius:0.6rem;padding:0.6rem 0.875rem;color:var(--text,#f3f4f6);font-size:0.85rem;" />
+        </div>
+      </div>
       <div style="margin-bottom:1.75rem">
-        <label for="edit-link-expires" style="font-size:0.75rem;color:var(--text-dim,#9ca3af);font-weight:500;display:block;margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:0.05em">Link Expires At <span style="font-weight:400;text-transform:none;font-size:0.7rem;color:#6b7280">(link band ho jaata hai is date ke baad)</span></label>
+        <label for="edit-link-expires" style="font-size:0.75rem;color:var(--text-dim,#9ca3af);font-weight:500;display:block;margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:0.05em">Link Expires At <span style="font-weight:400;text-transform:none;font-size:0.7rem;color:#6b7280">(link stops opening after this date)</span></label>
         <input type="datetime-local" id="edit-link-expires" style="width:100%;background:var(--surface-2,#1e2738);border:1px solid rgba(255,255,255,0.12);border-radius:0.6rem;padding:0.65rem 0.875rem;color:var(--text,#f3f4f6);font-size:0.9rem;outline:none;box-sizing:border-box;color-scheme:dark;" />
         <div style="margin-top:0.5rem;display:flex;align-items:center;gap:0.5rem">
           <input type="checkbox" id="edit-link-never-expires" style="cursor:pointer;width:14px;height:14px;accent-color:var(--primary,#a78bfa)" />
@@ -176,6 +216,14 @@ function ensureEditModal() {
     el.disabled = e.target.checked;
     if (e.target.checked) el.value = '';
   });
+  document.getElementById('edit-link-autodelete').addEventListener('change', (e) => {
+    const customWrap = document.getElementById('edit-link-custom-autodelete-wrap');
+    if (e.target.value === 'custom') {
+      customWrap.style.display = 'block';
+    } else {
+      customWrap.style.display = 'none';
+    }
+  });
   document.getElementById('link-edit-save-btn').addEventListener('click', saveEditLink);
 }
 
@@ -191,6 +239,30 @@ function openEditLinkModal(linkData) {
     urlEl.innerHTML = `<span style="color:#6b7280">URL:</span> <span style="color:#a5b4fc">${linkData.shareLink}</span>`;
   }
   document.getElementById('edit-link-status').value = linkData.status || 'active';
+
+  // Populate Auto-Delete
+  const adSelect = document.getElementById('edit-link-autodelete');
+  const customWrap = document.getElementById('edit-link-custom-autodelete-wrap');
+  const customInput = document.getElementById('edit-link-custom-autodelete');
+  const secs = linkData.autoDeleteSeconds;
+
+  if (!secs || secs <= 0) {
+    adSelect.value = 'never';
+    customWrap.style.display = 'none';
+    customInput.value = '';
+  } else {
+    const standardValues = ['60', '180', '300', '600', '900', '1800', '3600', '21600', '43200', '86400', '172800'];
+    if (standardValues.includes(String(secs))) {
+      adSelect.value = String(secs);
+      customWrap.style.display = 'none';
+      customInput.value = '';
+    } else {
+      adSelect.value = 'custom';
+      customWrap.style.display = 'block';
+      customInput.value = secs;
+    }
+  }
+
   const expiresInput = document.getElementById('edit-link-expires');
   const neverCb = document.getElementById('edit-link-never-expires');
   if (linkData.expiresAt) {
@@ -219,7 +291,20 @@ async function saveEditLink() {
   const status = document.getElementById('edit-link-status').value;
   const neverExpires = document.getElementById('edit-link-never-expires').checked;
   const expiresRaw = document.getElementById('edit-link-expires').value;
-  const payload = { status };
+  
+  // Resolve Auto-Delete Seconds
+  const adVal = document.getElementById('edit-link-autodelete').value;
+  let autoDeleteSeconds = null;
+  if (adVal === 'never') {
+    autoDeleteSeconds = null;
+  } else if (adVal === 'custom') {
+    const customSecs = parseInt(document.getElementById('edit-link-custom-autodelete').value, 10);
+    autoDeleteSeconds = isNaN(customSecs) || customSecs <= 0 ? null : customSecs;
+  } else {
+    autoDeleteSeconds = parseInt(adVal, 10);
+  }
+
+  const payload = { status, autoDeleteSeconds };
   if (neverExpires) payload.expiresAt = null;
   else if (expiresRaw) payload.expiresAt = new Date(expiresRaw).toISOString();
   saveBtn.textContent = 'Saving...';
