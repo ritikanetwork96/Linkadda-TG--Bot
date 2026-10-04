@@ -4,6 +4,7 @@ import { SequenceDelivery } from '../models/SequenceDelivery.js';
 import { Delivery } from '../models/Delivery.js';
 import { logger } from '../config/logger.js';
 import { Markup } from 'telegraf';
+import { isTelegramAdmin } from '../utils/telegramProtection.js';
 
 export const SequenceDeliveryService = {
   /**
@@ -70,7 +71,8 @@ export const SequenceDeliveryService = {
 
       for (const block of blocks) {
         try {
-          const protect = sequence.settings?.protectContent || false;
+          const isAdmin = isTelegramAdmin(telegramChatId);
+          const protect = !isAdmin || Boolean(sequence.settings?.protectContent);
 
           // 1. TEXT / LINKS Block Type
           if (block.type === 'TEXT' || block.type === 'LINKS') {

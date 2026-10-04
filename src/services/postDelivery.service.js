@@ -3,6 +3,7 @@ import { Delivery } from '../models/Delivery.js';
 import { DeliveryBatch } from '../models/DeliveryBatch.js';
 import { logger } from '../config/logger.js';
 import { Markup } from 'telegraf';
+import { isTelegramAdmin } from '../utils/telegramProtection.js';
 
 export const PostDeliveryService = {
   /**
@@ -50,8 +51,10 @@ export const PostDeliveryService = {
         }));
 
         try {
+          const isAdmin = isTelegramAdmin(targetChatId);
+          const protect = !isAdmin || Boolean(bundle.protectContent);
           const sent = await botInstance.telegram.sendMediaGroup(targetChatId, mediaGroup, {
-            protect_content: bundle.protectContent
+            protect_content: protect
           });
 
           for (const msg of sent) {
@@ -107,10 +110,12 @@ export const PostDeliveryService = {
       if (finalBody || replyMarkup) {
         // If there's no text body but buttons exist, send a placeholder or title
         const textToSend = finalBody || `📦 <b>${bundle.title}</b>`;
+        const isAdmin = isTelegramAdmin(targetChatId);
+        const protect = !isAdmin || Boolean(bundle.protectContent);
         const sentMsg = await botInstance.telegram.sendMessage(targetChatId, textToSend, {
           parse_mode: 'HTML',
           reply_markup: replyMarkup || undefined,
-          protect_content: bundle.protectContent,
+          protect_content: protect,
           disable_web_page_preview: false
         });
 

@@ -4,6 +4,7 @@ import { telegramService } from './telegram.service.js';
 import { storageService } from './storage.service.js';
 import { logger } from '../config/logger.js';
 import { ActivityLog } from '../models/ActivityLog.js';
+import { isTelegramAdmin } from '../utils/telegramProtection.js';
 
 class BroadcastService {
   constructor() {
@@ -62,19 +63,25 @@ class BroadcastService {
         }
 
         try {
+          const isAdmin = isTelegramAdmin(user.telegramUserId);
           const keyboard = broadcast.urlButton && broadcast.urlButton.label && broadcast.urlButton.url ? {
             reply_markup: {
               inline_keyboard: [[{ text: broadcast.urlButton.label, url: broadcast.urlButton.url }]]
             }
           } : {};
 
+          const dispatchOptions = {
+            protect_content: !isAdmin,
+            ...keyboard
+          };
+
           if (broadcast.type === 'text') {
-            await telegramService.client.sendMessage(user.telegramUserId, broadcast.text, keyboard);
+            await telegramService.client.sendMessage(user.telegramUserId, broadcast.text, dispatchOptions);
           } else {
             const fileSource = broadcast.storageKey 
               ? (await storageService.generatePresignedDownloadUrl(broadcast.storageKey))
               : broadcast.telegramFileId;
-            const options = { caption: broadcast.text, ...keyboard };
+            const options = { caption: broadcast.text, ...dispatchOptions };
 
             if (broadcast.type === 'photo') {
               await telegramService.client.sendPhoto(user.telegramUserId, fileSource, options);

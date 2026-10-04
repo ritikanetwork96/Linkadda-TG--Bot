@@ -1,5 +1,6 @@
 import { Telegram, Markup } from 'telegraf';
 import { config } from '../config/env.js';
+import { isTelegramAdmin } from '../utils/telegramProtection.js';
 import { Delivery } from '../models/Delivery.js';
 import { Content } from '../models/Content.js';
 import { storageService } from './storage.service.js';
@@ -24,7 +25,7 @@ export const telegramService = {
     let sentMessage = null;
     const sendOptions = {};
     
-    const isAdmin = config.adminTelegramIds.map(String).includes(String(chatId));
+    const isAdmin = isTelegramAdmin(chatId);
     if (!isAdmin || options.protectContent) {
       sendOptions.protect_content = true;
     }
@@ -236,7 +237,7 @@ export const telegramService = {
     }
 
     const sendOptions = {};
-    const isAdmin = config.adminTelegramIds.map(String).includes(String(chatId));
+    const isAdmin = isTelegramAdmin(chatId);
     if (!isAdmin || options.protectContent) {
       sendOptions.protect_content = true;
     }
@@ -410,7 +411,8 @@ export const telegramService = {
    * @returns {Promise<object>} Telegram sent message object
    */
   async sendWelcomeMessage(chatId, text) {
-    return telegram.sendMessage(chatId, text);
+    const isAdmin = isTelegramAdmin(chatId);
+    return telegram.sendMessage(chatId, text, { protect_content: !isAdmin });
   },
 
   // Cache of Telegram API client instances per botId

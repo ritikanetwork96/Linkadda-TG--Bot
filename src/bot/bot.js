@@ -6,35 +6,10 @@ import { startHandler } from './handlers/start.handler.js';
 import { messageHandler } from './handlers/message.handler.js';
 import { callbackHandler } from './handlers/callback.handler.js';
 import { handleAdminStart, handleAdminCallback, handleAdminMessage, isAdmin } from './handlers/admin.handler.js';
+import { isTelegramAdmin, installTelegramContentProtection } from '../utils/telegramProtection.js';
 
-// ── Intercept Outgoing Telegram API Calls for Content Protection ─────────────────
-const originalCallApi = Telegram.prototype.callApi;
-Telegram.prototype.callApi = async function (method, data, options) {
-  const mediaSendingMethods = [
-    'sendMessage',
-    'sendPhoto',
-    'sendVideo',
-    'sendAudio',
-    'sendDocument',
-    'sendAnimation',
-    'sendVoice',
-    'sendVideoNote',
-    'sendMediaGroup'
-  ];
-
-  if (mediaSendingMethods.includes(method) && data && data.chat_id) {
-    const chatIdStr = data.chat_id.toString();
-    const isAdminUser = config.adminTelegramIds.includes(chatIdStr);
-
-    if (!isAdminUser) {
-      data.protect_content = true;
-    } else {
-      data.protect_content = false;
-    }
-  }
-
-  return originalCallApi.call(this, method, data, options);
-};
+// Ensure content protection hook is active
+installTelegramContentProtection();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // USER BOT  (public, serves all Telegram users)
