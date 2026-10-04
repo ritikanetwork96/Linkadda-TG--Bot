@@ -298,14 +298,17 @@
       
       <div class="row-split">
         <div>
-          <h3 class="mb-4">Recent Users</h3>
+          <div class="d-flex justify-between align-center mb-3">
+            <h3 style="margin: 0; font-size: 1.05rem;">Recent Users</h3>
+            <a href="#users" style="font-size: 0.8rem; color: var(--accent-cyan); text-decoration: none; font-weight: 500;">View All &rarr;</a>
+          </div>
           <div class="table-container">
-            <table class="data-table" id="dashboard-users-table">
+            <table class="data-table dashboard-compact-table" id="dashboard-users-table">
               <thead>
                 <tr>
                   <th>Telegram User</th>
                   <th>Username</th>
-                  <th>Joined</th>
+                  <th style="width: 100px; text-align: right;">Joined</th>
                 </tr>
               </thead>
               <tbody>
@@ -316,14 +319,17 @@
         </div>
         
         <div>
-          <h3 class="mb-4">Recent Content</h3>
+          <div class="d-flex justify-between align-center mb-3">
+            <h3 style="margin: 0; font-size: 1.05rem;">Recent Content</h3>
+            <a href="#content" style="font-size: 0.8rem; color: var(--accent-cyan); text-decoration: none; font-weight: 500;">View All &rarr;</a>
+          </div>
           <div class="table-container">
-            <table class="data-table" id="dashboard-content-table">
+            <table class="data-table dashboard-compact-table" id="dashboard-content-table">
               <thead>
                 <tr>
                   <th>Title</th>
-                  <th>Type</th>
-                  <th>Status</th>
+                  <th style="width: 85px; text-align: center;">Type</th>
+                  <th style="width: 85px; text-align: center;">Status</th>
                 </tr>
               </thead>
               <tbody>

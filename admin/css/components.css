@@ -158,6 +158,26 @@
   min-width: 650px;
 }
 
+/* Dashboard Compact Tables (Recent Users & Recent Content) */
+.data-table.dashboard-compact-table {
+  min-width: 0 !important;
+  width: 100% !important;
+  table-layout: auto;
+}
+
+.data-table.dashboard-compact-table th,
+.data-table.dashboard-compact-table td {
+  padding: 0.75rem 0.85rem;
+  font-size: 0.82rem;
+}
+
+.data-table.dashboard-compact-table .content-title-cell {
+  max-width: none;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.35;
+}
+
 .data-table thead tr {
   background: rgba(255, 255, 255, 0.025);
   border-bottom: 1px solid var(--border);

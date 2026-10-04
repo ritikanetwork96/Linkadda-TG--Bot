@@ -183,9 +183,9 @@ window.addEventListener('load-dashboard', async () => {
     } else {
       contentBody.innerHTML = recentContent.map(item => `
         <tr>
-          <td class="text-truncate max-w-150"><strong>${escapeHTML(item.title)}</strong></td>
-          <td><span class="badge badge-info">${escapeHTML(item.type)}</span></td>
-          <td><span class="badge ${item.status === 'active' ? 'badge-success' : 'badge-neutral'}">${escapeHTML(item.status)}</span></td>
+          <td class="content-title-cell"><strong>${escapeHTML(item.title)}</strong></td>
+          <td style="text-align: center;"><span class="badge badge-info">${escapeHTML(item.type)}</span></td>
+          <td style="text-align: center;"><span class="badge ${item.status === 'active' ? 'badge-success' : 'badge-neutral'}">${escapeHTML(item.status)}</span></td>
         </tr>
       `).join('');
     }
